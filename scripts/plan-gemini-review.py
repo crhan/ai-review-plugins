@@ -327,17 +327,32 @@ def merge_results(gemini_result: dict, qwen_result: dict, main_request_id = None
         else:
             logger.info(f"Gemini failed: {gemini_result.get('error')}, ignoring its opinion")
 
-    # If Qwen says APPROVE, pass through
-    if qwen_decision == "APPROVE":
-        return {"decision": "APPROVE", "reason": qwen_reason, "model": "qwen"}
+    # Get Gemini decision (if successful) or default to APPROVE if failed
+    gemini_decision = "APPROVE"
+    gemini_reason = ""
+    if gemini_result.get("success"):
+        gemini_decision = gemini_result.get("decision", "APPROVE")
+        gemini_reason = gemini_result.get("reason", "")
 
-    # Qwen has concerns or reject - use its decision
-    return {
-        "decision": qwen_decision,
-        "reason": qwen_reason,
-        "feedback": qwen_feedback,
-        "model": "qwen"
-    }
+    # If either model says CONCERNS or REJECT, block
+    if qwen_decision in ("CONCERNS", "REJECT"):
+        return {
+            "decision": qwen_decision,
+            "reason": qwen_reason,
+            "feedback": qwen_feedback,
+            "model": "qwen"
+        }
+
+    if gemini_decision in ("CONCERNS", "REJECT"):
+        return {
+            "decision": gemini_decision,
+            "reason": gemini_reason,
+            "feedback": gemini_result.get("feedback", ""),
+            "model": "gemini"
+        }
+
+    # Both approve, pass through
+    return {"decision": "APPROVE", "reason": qwen_reason, "model": "qwen"}
 
 
 def main():
@@ -460,6 +475,7 @@ Respond with ONLY a JSON object (no other text):
 - CONCERNS: Plan needs minor improvements
 - REJECT: Plan has critical issues"""
 
+    logger.info(f"Prompt length: {len(prompt)} chars")
     logger.debug(f"Prompt ({len(prompt)} chars):\n{prompt}")
 
     # Stage 6: Parallel Review Calls (Gemini + Qwen)
@@ -499,6 +515,15 @@ Respond with ONLY a JSON object (no other text):
     # Stage 8: Deny Handling
     log_with_request(main_request_id, logger.info, f"Decision: {decision} (model: {model}), Reason: {reason}")
     if decision == "APPROVE":
+        # Log approval output for records
+        output = {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "allow",
+                "permissionDecisionReason": "Plan approved"
+            }
+        }
+        log_with_request(main_request_id, logger.info, f"Output: {json.dumps(output, ensure_ascii=False)}")
         logger.info("Approved, allowing")
         return 0
 
