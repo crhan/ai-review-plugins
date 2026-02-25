@@ -9,6 +9,5 @@
   "repository": "https://github.com/crhan/ai-review-plugins",
   "license": "MIT",
   "keywords": ["ai", "review", "gemini", "plan", "security"],
-  "category": "security",
   "hooks": "./hooks/hooks.json"
 }
