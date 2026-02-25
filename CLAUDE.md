@@ -29,7 +29,6 @@ python3 /Users/ruohan.chen/Documents/GitHub/ai-review-plugins/scripts/plan-gemin
 - **禁用审查**：设置环境变量 `GEMINI_REVIEW_OFF=1`
 - **代理**：API 调用使用 `http://127.0.0.1:7890`（脚本中硬编码）
 - **API**：使用 Gemini CLI，模型为 `gemini-3-pro-preview`
-- **标记清理**：清理 `~/.claude/hooks/.markers/` 中超过 30 分钟的过期标记
 
 ## 审查标准
 
