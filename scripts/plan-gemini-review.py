@@ -110,7 +110,7 @@ def main():
     if cwd:
         project_claude_path = Path(cwd) / "CLAUDE.md"
         if project_claude_path.exists():
-            project_claude = "\n".join(project_claude_path.read_text().splitlines()[:150])
+            project_claude = project_claude_path.read_text()
 
     # Get recent user messages from transcript_path
     recent_messages = ""
@@ -144,7 +144,7 @@ def main():
 ### Global CLAUDE.md
 {global_claude}
 
-### Project CLAUDE.md (first 150 lines)
+### Project CLAUDE.md (full content)
 {project_claude}
 
 ### Recent User Messages
