@@ -35,7 +35,7 @@ logging.getLogger().handlers.clear()
 info_handler = logging.FileHandler(INFO_LOG)
 info_handler.setLevel(logging.INFO)
 info_handler.setFormatter(logging.Formatter(
-    "[%(asctime)s] [%(session)s] %(levelname)s: %(message)s",
+    "[%(asctime)s] [%(session)s] [%(request_id)s] %(levelname)s: %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S"
 ))
 
@@ -43,14 +43,14 @@ info_handler.setFormatter(logging.Formatter(
 debug_handler = logging.FileHandler(DEBUG_LOG)
 debug_handler.setLevel(logging.DEBUG)
 debug_handler.setFormatter(logging.Formatter(
-    "[%(asctime)s] [%(session)s] %(levelname)s: %(message)s",
+    "[%(asctime)s] [%(session)s] [%(request_id)s] %(levelname)s: %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S"
 ))
 
 # Console handler
 console_handler = logging.StreamHandler(sys.stderr)
 console_handler.setFormatter(logging.Formatter(
-    "[%(asctime)s] [%(session)s] %(levelname)s: %(message)s",
+    "[%(asctime)s] [%(session)s] [%(request_id)s] %(levelname)s: %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S"
 ))
 
@@ -62,11 +62,13 @@ logging.getLogger().addHandler(console_handler)
 logger = logging.getLogger("plan-gemini-review")
 
 _current_session = ""
+_current_request_id = ""
 
 
 class SessionFilter(logging.Filter):
     def filter(self, record):
         record.session = _current_session[:8] if _current_session else "unknown"
+        record.request_id = _current_request_id if _current_request_id else "unknown"
         return True
 
 
@@ -80,12 +82,14 @@ def set_session(session_id):
 
 def generate_request_id():
     """Generate a unique request ID for each invocation (timestamp + random)"""
-    return f"{int(time.time() * 1000)}-{uuid.uuid4().hex[:8]}"
+    global _current_request_id
+    _current_request_id = f"{int(time.time() * 1000)}-{uuid.uuid4().hex[:8]}"
+    return _current_request_id
 
 
 def main():
     request_id = generate_request_id()
-    logger.debug(f"Script started (request_id: {request_id})")
+    logger.debug("Script started")
     # Read input JSON from stdin ONCE
     try:
         input_data = json.load(sys.stdin)
