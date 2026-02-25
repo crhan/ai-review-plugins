@@ -102,8 +102,8 @@ def main():
         logger.debug("No session_id")
         return 0
 
-    logger.info(f"Session ID: {session_id}")
     set_session(session_id)
+    logger.info(f"Session ID: {session_id}")
 
     # Stage 2: Extract Plan Content
     # Get plan from tool_input
@@ -200,7 +200,7 @@ Respond with ONLY a JSON object (no other text):
 
     # Stage 6: Gemini Call
     start_time = time.time()
-    logger.info("Calling Gemini...")
+    logger.info(f"Calling Gemini... (prompt length: {len(prompt)} chars)")
 
     env = os.environ.copy()
     env["http_proxy"] = "http://127.0.0.1:7890"
