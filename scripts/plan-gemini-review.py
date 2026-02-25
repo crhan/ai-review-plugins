@@ -91,7 +91,7 @@ def set_session(session_id):
     _current_session = session_id
 
 
-def call_reviewer(model_type: str, model_name: str, prompt: str, timeout: int) -> dict:
+def call_reviewer(model_type: str, model_name: str, prompt: str, timeout: int, cwd: str = "") -> dict:
     """Call a reviewer model (Gemini or Qwen) and return the decision result."""
     # Generate a unique request_id for this specific call (random only, no timestamp)
     request_id = uuid.uuid4().hex[:8]
@@ -116,7 +116,8 @@ def call_reviewer(model_type: str, model_name: str, prompt: str, timeout: int) -
             capture_output=True,
             text=True,
             timeout=timeout,
-            env=env
+            env=env,
+            cwd=cwd
         )
         elapsed = time.time() - start_time
         log_with_request(request_id, logger.info, f"{model_type} call completed in {elapsed:.2f}s")
@@ -488,8 +489,8 @@ Respond with ONLY a JSON object (no other text):
     qwen_result = None
 
     with ThreadPoolExecutor(max_workers=2) as executor:
-        gemini_future = executor.submit(call_reviewer, "gemini", "gemini-3-pro-preview", prompt, timeout_seconds)
-        qwen_future = executor.submit(call_reviewer, "qwen", "coder-model", prompt, timeout_seconds)
+        gemini_future = executor.submit(call_reviewer, "gemini", "gemini-3-pro-preview", prompt, timeout_seconds, cwd)
+        qwen_future = executor.submit(call_reviewer, "qwen", "coder-model", prompt, timeout_seconds, cwd)
 
         # Wait for both to complete
         try:
