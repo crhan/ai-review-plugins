@@ -19,7 +19,7 @@ scripts/plan-gemini-review.py → 主逻辑（Python 脚本）
 ## 运行脚本
 
 ```bash
-python3 /home/ruohanc/project/review_hooks/scripts/plan-gemini-review.py
+python3 /Users/ruohan.chen/Documents/GitHub/ai-review-plugins/scripts/plan-gemini-review.py
 ```
 
 脚本从 stdin 读取 JSON 输入（由 Claude Code 钩子系统提供）。
@@ -43,4 +43,4 @@ python3 /home/ruohanc/project/review_hooks/scripts/plan-gemini-review.py
 
 ## 日志输出
 
-日志同时写入 `review_hooks.log` 和 stderr。日志格式包含会话 ID（前 8 位）。
+日志同时写入 `~/.cache/gemini_plan_review/review.log` 和 stderr。日志格式包含会话 ID（前 8 位）。

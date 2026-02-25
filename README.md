@@ -26,13 +26,17 @@ Claude Code 插件 - 使用 Gemini AI 进行计划审查
 
 ## 安装
 
-1. 克隆仓库到本地：
+1. 添加 Marketplace：
 
 ```bash
-git clone https://github.com/crhan/ai-review-plugins.git ~/.claude/plugins/gemini-plan-review
+/plugin marketplace add crhan/ai-review-plugins
 ```
 
-2. 在 Claude Code 设置中启用插件
+2. 安装插件：
+
+```bash
+/plugin install gemini-plan-review@ai-review-plugins
+```
 
 ## 配置
 
@@ -77,7 +81,7 @@ env["https_proxy"] = "http://127.0.0.1:7890"
 
 ## 日志
 
-日志同时写入 `review_hooks.log` 和 stderr，便于调试和问题排查。
+日志同时写入 `review.log`（位于 `~/.cache/gemini_plan_review/`）和 stderr，便于调试和问题排查。
 
 ## 许可证
 
