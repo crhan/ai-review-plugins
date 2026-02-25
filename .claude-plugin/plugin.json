@@ -1,6 +1,6 @@
 {
   "name": "gemini-plan-review",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Plan review hooks using Gemini for ExitPlanMode validation",
   "author": {
     "name": "ruohanc"
