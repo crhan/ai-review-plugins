@@ -16,7 +16,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 
 # Get plugin root directory - use explicit path
-PLUGIN_DIR = Path.home() / ".cache" / "review_hooks"
+PLUGIN_DIR = Path.home() / ".cache" / "gemini_plan_review"
 LOG_FILE = PLUGIN_DIR / "review.log"
 
 # Ensure directories exist

@@ -1,4 +1,4 @@
-# review-hooks
+# ai-review-plugins
 
 Claude Code 插件 - 使用 Gemini AI 进行计划审查
 
@@ -29,7 +29,7 @@ Claude Code 插件 - 使用 Gemini AI 进行计划审查
 1. 克隆仓库到本地：
 
 ```bash
-git clone https://github.com/crhan/review-hooks.git ~/.claude/plugins/review-hooks
+git clone https://github.com/crhan/ai-review-plugins.git ~/.claude/plugins/gemini-plan-review
 ```
 
 2. 在 Claude Code 设置中启用插件

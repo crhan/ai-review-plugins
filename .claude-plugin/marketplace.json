@@ -1,0 +1,25 @@
+{
+  "name": "ai-review-plugins",
+  "owner": {
+    "name": "ruohanc"
+  },
+  "metadata": {
+    "description": "AI-powered plan review plugins using Gemini for code review and plan validation"
+  },
+  "plugins": [
+    {
+      "name": "gemini-plan-review",
+      "source": "./",
+      "description": "Plan review hooks using Gemini for ExitPlanMode validation",
+      "version": "1.0.0",
+      "author": {
+        "name": "ruohanc"
+      },
+      "homepage": "https://github.com/crhan/ai-review-plugins",
+      "repository": "https://github.com/crhan/ai-review-plugins",
+      "license": "MIT",
+      "keywords": ["ai", "review", "gemini", "plan", "security"],
+      "category": "security"
+    }
+  ]
+}

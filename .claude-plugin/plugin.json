@@ -1,9 +1,14 @@
 {
-  "name": "review-hooks",
+  "name": "gemini-plan-review",
   "version": "1.0.0",
   "description": "Plan review hooks using Gemini for ExitPlanMode validation",
   "author": {
     "name": "ruohanc"
   },
+  "homepage": "https://github.com/crhan/ai-review-plugins",
+  "repository": "https://github.com/crhan/ai-review-plugins",
+  "license": "MIT",
+  "keywords": ["ai", "review", "gemini", "plan", "security"],
+  "category": "security",
   "hooks": "./hooks/hooks.json"
 }
