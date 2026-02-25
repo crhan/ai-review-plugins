@@ -217,7 +217,9 @@ Respond with ONLY a JSON object (no other text):
         gemini_result = result.stdout.strip()
         elapsed = time.time() - start_time
         logger.info(f"Gemini call completed in {elapsed:.2f}s")
-        logger.debug(f"Gemini raw result: {gemini_result}")
+        logger.debug(f"Gemini stdout: {gemini_result}")
+        logger.debug(f"Gemini stderr: {result.stderr}")
+        logger.debug(f"Gemini returncode: {result.returncode}")
     except subprocess.TimeoutExpired:
         elapsed = time.time() - start_time
         logger.error(f"Gemini call timed out after {elapsed:.2f}s")
