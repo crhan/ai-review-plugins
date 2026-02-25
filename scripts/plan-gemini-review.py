@@ -12,6 +12,7 @@ import json
 import subprocess
 import logging
 import time
+import uuid
 from pathlib import Path
 from datetime import datetime, timedelta
 
@@ -77,8 +78,14 @@ def set_session(session_id):
     _current_session = session_id
 
 
+def generate_request_id():
+    """Generate a unique request ID for each invocation (timestamp + random)"""
+    return f"{int(time.time() * 1000)}-{uuid.uuid4().hex[:8]}"
+
+
 def main():
-    logger.debug("Script started")
+    request_id = generate_request_id()
+    logger.debug(f"Script started (request_id: {request_id})")
     # Read input JSON from stdin ONCE
     try:
         input_data = json.load(sys.stdin)
