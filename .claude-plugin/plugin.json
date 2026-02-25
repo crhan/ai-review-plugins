@@ -1,0 +1,9 @@
+{
+  "name": "review-hooks",
+  "version": "1.0.0",
+  "description": "Plan review hooks using Gemini for ExitPlanMode validation",
+  "author": {
+    "name": "ruohanc"
+  },
+  "hooks": "./hooks/hooks.json"
+}
