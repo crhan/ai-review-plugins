@@ -31,14 +31,16 @@ logging.getLogger().setLevel(logging.DEBUG)
 logging.getLogger().handlers.clear()
 
 # Info log handler - records INFO and above
-info_handler = logging.FileHandler(INFO_LOG, level=logging.INFO)
+info_handler = logging.FileHandler(INFO_LOG)
+info_handler.setLevel(logging.INFO)
 info_handler.setFormatter(logging.Formatter(
     "[%(asctime)s] [%(session)s] %(levelname)s: %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S"
 ))
 
 # Debug log handler - records DEBUG and above
-debug_handler = logging.FileHandler(DEBUG_LOG, level=logging.DEBUG)
+debug_handler = logging.FileHandler(DEBUG_LOG)
+debug_handler.setLevel(logging.DEBUG)
 debug_handler.setFormatter(logging.Formatter(
     "[%(asctime)s] [%(session)s] %(levelname)s: %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S"
