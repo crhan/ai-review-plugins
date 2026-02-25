@@ -15,10 +15,12 @@ import time
 from pathlib import Path
 from datetime import datetime, timedelta
 
-# Get plugin root directory
-CLAUDE_PLUGIN_ROOT = os.environ.get("CLAUDE_PLUGIN_ROOT", str(Path(__file__).parent.parent))
+# Get plugin root directory - use explicit path
+PLUGIN_DIR = Path.home() / ".cache" / "review_hooks"
+LOG_FILE = PLUGIN_DIR / "review.log"
 
-MARKER_DIR = Path.home() / ".claude" / "hooks" / ".markers"
+# Ensure directories exist
+PLUGIN_DIR.mkdir(parents=True, exist_ok=True)
 
 # Setup logging
 logging.basicConfig(
@@ -26,7 +28,7 @@ logging.basicConfig(
     format="[%(asctime)s] [%(session)s] %(levelname)s: %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
     handlers=[
-        logging.FileHandler(Path(CLAUDE_PLUGIN_ROOT) / "review_hooks.log"),
+        logging.FileHandler(LOG_FILE),
         logging.StreamHandler(sys.stderr)
     ]
 )
@@ -77,16 +79,7 @@ def main():
     logger.info(f"Session ID: {session_id}")
     set_session(session_id)
 
-    # Stage 2: Clean up stale markers (older than 30 minutes)
-    # Note: We always review, never skip based on previous attempts
-    if MARKER_DIR.exists():
-        now = datetime.now()
-        for marker in MARKER_DIR.glob(".reviewed-*"):
-            mtime = datetime.fromtimestamp(marker.stat().st_mtime)
-            if now - mtime > timedelta(minutes=30):
-                marker.unlink()
-
-    # Stage 3: Extract Plan Content
+    # Stage 2: Extract Plan Content
     # Get plan from tool_input
     tool_input = input_data.get("tool_input", {})
     plan_content = tool_input.get("plan", "")
