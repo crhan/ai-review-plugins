@@ -17,21 +17,45 @@ from datetime import datetime, timedelta
 
 # Get plugin root directory - use explicit path
 PLUGIN_DIR = Path.home() / ".cache" / "gemini_plan_review"
-LOG_FILE = PLUGIN_DIR / "review.log"
+INFO_LOG = PLUGIN_DIR / "info.log"
+DEBUG_LOG = PLUGIN_DIR / "debug.log"
 
 # Ensure directories exist
 PLUGIN_DIR.mkdir(parents=True, exist_ok=True)
 
 # Setup logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="[%(asctime)s] [%(session)s] %(levelname)s: %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    handlers=[
-        logging.FileHandler(LOG_FILE),
-        logging.StreamHandler(sys.stderr)
-    ]
-)
+# Set root logger level to DEBUG (otherwise default is WARNING, which discards DEBUG/INFO messages)
+logging.getLogger().setLevel(logging.DEBUG)
+
+# Remove default handlers
+logging.getLogger().handlers.clear()
+
+# Info log handler - records INFO and above
+info_handler = logging.FileHandler(INFO_LOG, level=logging.INFO)
+info_handler.setFormatter(logging.Formatter(
+    "[%(asctime)s] [%(session)s] %(levelname)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+))
+
+# Debug log handler - records DEBUG and above
+debug_handler = logging.FileHandler(DEBUG_LOG, level=logging.DEBUG)
+debug_handler.setFormatter(logging.Formatter(
+    "[%(asctime)s] [%(session)s] %(levelname)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+))
+
+# Console handler
+console_handler = logging.StreamHandler(sys.stderr)
+console_handler.setFormatter(logging.Formatter(
+    "[%(asctime)s] [%(session)s] %(levelname)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+))
+
+# Add handlers to root logger
+logging.getLogger().addHandler(info_handler)
+logging.getLogger().addHandler(debug_handler)
+logging.getLogger().addHandler(console_handler)
+
 logger = logging.getLogger("plan-gemini-review")
 
 _current_session = ""
@@ -185,7 +209,7 @@ Respond with ONLY a JSON object (no other text):
             ["gemini", "-m", "gemini-3-pro-preview", "-p", prompt],
             capture_output=True,
             text=True,
-            timeout=120,
+            timeout=180,
             env=env
         )
         gemini_result = result.stdout.strip()

@@ -42,4 +42,8 @@ python3 /Users/ruohan.chen/Documents/GitHub/ai-review-plugins/scripts/plan-gemin
 
 ## 日志输出
 
-日志同时写入 `~/.cache/gemini_plan_review/review.log` 和 stderr。日志格式包含会话 ID（前 8 位）。
+日志同时写入两个文件：
+- `~/.cache/gemini_plan_review/info.log` - 记录 info 及以上级别
+- `~/.cache/gemini_plan_review/debug.log` - 记录 debug 及以上级别
+
+日志格式包含会话 ID（前 8 位）。
