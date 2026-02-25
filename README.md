@@ -70,7 +70,7 @@ env["https_proxy"] = "http://127.0.0.1:7890"
 1. 用户调用 `ExitPlanMode` 时，钩子触发
 2. 脚本提取计划内容（从工具输入或 `~/.claude/plans/` 目录）
 3. 组装上下文：
-   - 全局 CLAUDE.md (`~/config/CLAUDE.md`)
+   - 全局 CLAUDE.md (`~/.claude/CLAUDE.md`)
    - 项目 CLAUDE.md（前 150 行）
    - 近期用户消息（最近 5 条）
 4. 发送至 Gemini 进行审查
