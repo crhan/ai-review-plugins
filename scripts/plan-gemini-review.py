@@ -185,14 +185,18 @@ Respond with ONLY a JSON object (no other text):
             ["gemini", "-m", "gemini-3-pro-preview", "-p", prompt],
             capture_output=True,
             text=True,
-            timeout=60,
+            timeout=120,
             env=env
         )
         gemini_result = result.stdout.strip()
         elapsed = time.time() - start_time
         logger.info(f"Gemini call completed in {elapsed:.2f}s")
         logger.debug(f"Gemini raw result: {gemini_result}")
-    except (FileNotFoundError, subprocess.TimeoutExpired, Exception) as e:
+    except subprocess.TimeoutExpired:
+        elapsed = time.time() - start_time
+        logger.error(f"Gemini call timed out after {elapsed:.2f}s")
+        return 0
+    except (FileNotFoundError, Exception) as e:
         elapsed = time.time() - start_time
         logger.debug(f"Gemini error: {e} (took {elapsed:.2f}s)")
         return 0
