@@ -101,7 +101,7 @@ def main():
 
     # Stage 4: Assemble Context - inject full CLAUDE.md content
     global_claude = ""
-    claude_global_path = Path.home() / "config" / "CLAUDE.md"
+    claude_global_path = Path.home() / ".claude" / "CLAUDE.md"
     if claude_global_path.exists():
         global_claude = claude_global_path.read_text()
 
