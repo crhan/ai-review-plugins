@@ -118,8 +118,7 @@ async def call_qwen(
             url,
             headers=headers,
             json=payload,
-            timeout=60.0,
-            proxies={"http://": proxy, "https://": proxy}
+            timeout=60.0
         )
         response.raise_for_status()
         result = response.json()
@@ -194,8 +193,7 @@ async def call_gemini(
             url,
             headers=headers,
             json=payload,
-            timeout=60.0,
-            proxies={"http://": proxy, "https://": proxy}
+            timeout=60.0
         )
         response.raise_for_status()
         result = response.json()
@@ -243,6 +241,7 @@ async def audit_plan(plan_content: str) -> dict:
         }
 
     # 创建异步客户端
+    async with httpx.AsyncClient(proxy=proxy if proxy else None) as client:
         # 并行调用双模型
         tasks = []
 
