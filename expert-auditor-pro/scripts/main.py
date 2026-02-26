@@ -197,7 +197,8 @@ async def call_qwen(
     api_key: str,
     model: str,
     plan_content: str,
-    proxy: str
+    proxy: str,
+    context: dict
 ) -> dict:
     """调用 Qwen (DashScope) API"""
     url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
@@ -206,13 +207,29 @@ async def call_qwen(
         "Content-Type": "application/json"
     }
 
-    system_prompt = """你是一位资深的代码审查专家和架构师。审查计划时，请从以下6个维度评估：
+    # 从 context 中提取上下文（限制长度以避免超时）
+    global_claude = context.get("global_claude", "")[:3000] if context.get("global_claude") else ""
+    project_claude = context.get("project_claude", "")[:2000] if context.get("project_claude") else ""
+    recent_messages = context.get("recent_messages", "")[:1500] if context.get("recent_messages") else ""
+
+    system_prompt = f"""你是一位资深的代码审查专家和架构师。审查计划时，请从以下6个维度评估：
 1. 完整性 - 是否包含所有必要步骤？
 2. 正确性 - 计划是否正确解决问题？
 3. 安全性 - 是否有防止破坏性操作的保护措施？
 4. 可逆性 - 更改是否可以回滚？
 5. 安全性 - 是否引入安全漏洞？
 6. 最佳实践 - 是否遵循项目约定？
+
+## 上下文
+
+### 全局 CLAUDE.md
+{global_claude if global_claude else "(无)"}
+
+### 项目 CLAUDE.md
+{project_claude if project_claude else "(无)"}
+
+### 近期用户消息
+{recent_messages if recent_messages else "(无)"}
 
 请直接给出审查结论，使用 APPROVE / CONCERNS / REJECT 之一作为开头。"""
 
@@ -233,7 +250,7 @@ async def call_qwen(
             url,
             headers=headers,
             json=payload,
-            timeout=60.0
+            timeout=120.0
         )
         response.raise_for_status()
         result = response.json()
@@ -259,11 +276,12 @@ async def call_qwen(
             "error": f"HTTP {e.response.status_code}: {e.response.text[:200]}"
         }
     except Exception as e:
-        logger.error(f"Qwen API 调用失败: {str(e)}")
+        import traceback
+        logger.error(f"Qwen API 调用失败: {type(e).__name__}: {str(e)}\n{traceback.format_exc()}")
         return {
             "success": False,
             "model": model,
-            "error": str(e)
+            "error": f"{type(e).__name__}: {str(e)}"
         }
 
 
@@ -272,7 +290,8 @@ async def call_gemini(
     api_key: str,
     model: str,
     plan_content: str,
-    proxy: str
+    proxy: str,
+    context: dict
 ) -> dict:
     """调用 Gemini API"""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
@@ -280,13 +299,29 @@ async def call_gemini(
         "Content-Type": "application/json"
     }
 
-    system_prompt = """你是一位资深的代码审查专家和架构师。审查计划时，请从以下6个维度评估：
+    # 从 context 中提取上下文（限制长度以避免超时）
+    global_claude = context.get("global_claude", "")[:3000] if context.get("global_claude") else ""
+    project_claude = context.get("project_claude", "")[:2000] if context.get("project_claude") else ""
+    recent_messages = context.get("recent_messages", "")[:1500] if context.get("recent_messages") else ""
+
+    system_prompt = f"""你是一位资深的代码审查专家和架构师。审查计划时，请从以下6个维度评估：
 1. 完整性 - 是否包含所有必要步骤？
 2. 正确性 - 计划是否正确解决问题？
 3. 安全性 - 是否有防止破坏性操作的保护措施？
 4. 可逆性 - 更改是否可以回滚？
 5. 安全性 - 是否引入安全漏洞？
 6. 最佳实践 - 是否遵循项目约定？
+
+## 上下文
+
+### 全局 CLAUDE.md
+{global_claude if global_claude else "(无)"}
+
+### 项目 CLAUDE.md
+{project_claude if project_claude else "(无)"}
+
+### 近期用户消息
+{recent_messages if recent_messages else "(无)"}
 
 请直接给出审查结论，使用 APPROVE / CONCERNS / REJECT 之一作为开头。"""
 
@@ -314,7 +349,7 @@ async def call_gemini(
             url,
             headers=headers,
             json=payload,
-            timeout=60.0
+            timeout=120.0
         )
         response.raise_for_status()
         result = response.json()
@@ -411,6 +446,13 @@ async def audit_plan(context: dict) -> dict:
 
     logger.debug(f"Loaded context: global_claude={len(global_claude)} chars, project_claude={len(project_claude)} chars, recent_messages={len(recent_messages)} chars")
 
+    # 构建传递给 API 的 context
+    context = {
+        "global_claude": global_claude,
+        "project_claude": project_claude,
+        "recent_messages": recent_messages
+    }
+
     config = load_config()
 
     proxy = config.get("proxy", "")
@@ -432,12 +474,12 @@ async def audit_plan(context: dict) -> dict:
         tasks = []
 
         if qwen_api_key:
-            tasks.append(call_qwen(client, qwen_api_key, qwen_model, plan_content, proxy))
+            tasks.append(call_qwen(client, qwen_api_key, qwen_model, plan_content, proxy, context))
         else:
             logger.warning("跳过 Qwen API 调用（未配置 API Key）")
 
         if gemini_api_key:
-            tasks.append(call_gemini(client, gemini_api_key, gemini_model, plan_content, proxy))
+            tasks.append(call_gemini(client, gemini_api_key, gemini_model, plan_content, proxy, context))
         else:
             logger.warning("跳过 Gemini API 调用（未配置 API Key）")
 
