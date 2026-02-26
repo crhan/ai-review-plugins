@@ -7,5 +7,17 @@
     "description": "AI-powered plan review plugins using Gemini for code review and plan validation"
   },
   "plugins": [
+    {
+      "name": "expert-auditor-pro",
+      "version": "1.2.0",
+      "description": "双模型审计插件 - 使用 Qwen + Gemini 并行审计计划",
+      "path": "expert-auditor-pro"
+    },
+    {
+      "name": "gemini-plan-review",
+      "version": "1.1.0",
+      "description": "Plan review hooks using Gemini for ExitPlanMode validation",
+      "path": "gemini-plan-review"
+    }
   ]
 }
