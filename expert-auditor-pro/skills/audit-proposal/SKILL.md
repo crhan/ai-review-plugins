@@ -16,16 +16,31 @@ description: This skill should be used when the user asks to "audit proposal", "
 
 ## 输入格式
 
-### 方式1：stdin JSON（Claude Code 调用时使用）
+### 最高优先级：自动发现 plan 文件
+
+调用时自动在对话上下文或者以下位置查找最近修改的 plan 文件：
+
+- `$CWD/docs/plans/`
+- `$HOME/.claude/plan/`
+
+找到后用 `--plan-file` 参数传入：
+
+```bash
+# 自动发现并审计
+PLAN_FILE=$(find "$PWD/docs/plans" "$HOME/.claude/plan" -name "*.md" -type f -exec ls -t {} + 2>/dev/null | head -1)
+uv run ${CLAUDE_PLUGIN_ROOT}/expert-auditor-pro/scripts/main.py --plan-file "$PLAN_FILE"
+```
+
+### 方式2：stdin JSON（Claude Code 调用时使用）
 
 从 stdin 读取 JSON，字段说明：
 
-| 字段 | 必填 | 说明 |
-|------|------|------|
-| `plan` | ✅ | 计划内容 |
-| `session_id` | - | 会话 ID（用于日志） |
-| `cwd` | - | 当前工作目录（用于加载项目 CLAUDE.md） |
-| `transcript_path` | - | transcript 文件路径（用于加载用户消息） |
+| 字段              | 必填 | 说明                                    |
+| ----------------- | ---- | --------------------------------------- |
+| `plan`            | ✅   | 计划内容                                |
+| `session_id`      | -    | 会话 ID（用于日志）                     |
+| `cwd`             | -    | 当前工作目录（用于加载项目 CLAUDE.md）  |
+| `transcript_path` | -    | transcript 文件路径（用于加载用户消息） |
 
 **示例：**
 
@@ -33,7 +48,7 @@ description: This skill should be used when the user asks to "audit proposal", "
 echo '{"plan": "创建用户认证功能", "session_id": "abc123", "cwd": "/project"}' | uv run ${CLAUDE_PLUGIN_ROOT}/expert-auditor-pro/scripts/main.py
 ```
 
-### 方式2：命令行参数
+### 方式3：命令行参数
 
 直接传入计划内容作为参数：
 
@@ -41,7 +56,7 @@ echo '{"plan": "创建用户认证功能", "session_id": "abc123", "cwd": "/proj
 uv run ${CLAUDE_PLUGIN_ROOT}/expert-auditor-pro/scripts/main.py "创建用户认证功能"
 ```
 
-### 方式3：stdin 原始文本
+### 方式4：stdin 原始文本
 
 管道传入纯文本计划：
 
@@ -77,13 +92,13 @@ echo "创建用户认证功能" | uv run ${CLAUDE_PLUGIN_ROOT}/expert-auditor-pr
 
 ## 决策规则（共识模式 B）
 
-| 场景 | 结果 |
-|------|------|
-| 任一模型 REJECT | REJECT |
-| 两个模型都 APPROVE | APPROVE |
-| 一个 APPROVE + 一个 CONCERNS | 警告通过 |
-| 两个模型都 CONCERNS | REJECT |
-| 任一模型失败 | 视为 CONCERNS |
+| 场景                         | 结果          |
+| ---------------------------- | ------------- |
+| 任一模型 REJECT              | REJECT        |
+| 两个模型都 APPROVE           | APPROVE       |
+| 一个 APPROVE + 一个 CONCERNS | 警告通过      |
+| 两个模型都 CONCERNS          | REJECT        |
+| 任一模型失败                 | 视为 CONCERNS |
 
 ## 依赖脚本
 
@@ -94,8 +109,9 @@ echo "创建用户认证功能" | uv run ${CLAUDE_PLUGIN_ROOT}/expert-auditor-pr
 ## 调用示例
 
 ```bash
-# 使用 uv run 执行（推荐）
-uv run ${CLAUDE_PLUGIN_ROOT}/expert-auditor-pro/scripts/main.py
+# 自动发现 plan 文件并审计（推荐）
+PLAN_FILE=$(find "$PWD/docs/plans" "$HOME/.claude/plan" -name "*.md" -type f -exec ls -t {} + 2>/dev/null | head -1)
+uv run ${CLAUDE_PLUGIN_ROOT}/expert-auditor-pro/scripts/main.py --plan-file "$PLAN_FILE"
 ```
 
 脚本会自动从 `${CLAUDE_PLUGIN_ROOT}/expert-auditor-pro/config.json` 读取配置。
@@ -103,6 +119,7 @@ uv run ${CLAUDE_PLUGIN_ROOT}/expert-auditor-pro/scripts/main.py
 ## 配置要求
 
 使用 `/setup_skill` 命令配置：
+
 - Qwen API Key
 - Gemini API Key
 - 代理设置（可选）

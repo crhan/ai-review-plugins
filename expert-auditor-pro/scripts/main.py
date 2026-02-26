@@ -680,12 +680,22 @@ async def main():
     # 先解析命令行参数（因为 stdin 只能读一次）
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--plan-file", action="store_true", help="从 stdin 读取计划")
+    parser.add_argument("--plan-file", type=str, help="Plan 文件路径")
     parser.add_argument("plan", nargs="*", default="")
     args = parser.parse_args()
 
-    # 如果有命令行参数，优先使用
-    if args.plan:
+    # 1. 如果指定了 --plan-file，读取文件内容
+    if args.plan_file:
+        plan_path = Path(args.plan_file)
+        if plan_path.exists():
+            context["plan"] = plan_path.read_text(encoding="utf-8")
+            logger.info(f"Using plan file: {plan_path}")
+        else:
+            logger.error(f"Plan file not found: {plan_path}")
+            print(f"错误: 文件不存在: {plan_path}", file=sys.stderr)
+            sys.exit(1)
+    # 2. 如果有命令行参数，使用参数内容
+    elif args.plan:
         context["plan"] = " ".join(args.plan)
         logger.debug("Using command line arguments")
     else:
