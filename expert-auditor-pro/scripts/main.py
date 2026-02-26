@@ -7,6 +7,7 @@ import asyncio
 import json
 import re
 import sys
+import time
 import uuid
 from pathlib import Path
 from typing import Any, Optional
@@ -245,6 +246,7 @@ async def call_qwen(
 
     logger.debug(f"调用 Qwen API, model: {model}")
 
+    start_time = time.time()
     try:
         response = await client.post(
             url,
@@ -255,21 +257,30 @@ async def call_qwen(
         response.raise_for_status()
         result = response.json()
 
-        logger.info("Qwen API 调用成功")
+        elapsed = time.time() - start_time
+        logger.info(f"Qwen API call completed in {elapsed:.2f}s")
+
+        # DEBUG 级别记录响应
+        content = result["choices"][0]["message"]["content"]
+        logger.debug(f"Qwen response:\n{content[:500]}...")
+
         # 解析 decision
-        decision_data = parse_decision_from_content(result["choices"][0]["message"]["content"])
+        decision_data = parse_decision_from_content(content)
+
+        logger.info(f"Qwen decision: {decision_data['decision']}, reason: {decision_data['reason'][:50]}")
 
         return {
             "success": True,
             "model": model,
-            "content": result["choices"][0]["message"]["content"],
+            "content": content,
             "decision": decision_data["decision"],
             "reason": decision_data["reason"],
             "feedback": decision_data["feedback"],
             "usage": result.get("usage", {})
         }
     except httpx.HTTPStatusError as e:
-        logger.error(f"Qwen API HTTP 错误: {e.response.status_code}")
+        elapsed = time.time() - start_time
+        logger.error(f"Qwen API HTTP 错误: {e.response.status_code} (after {elapsed:.2f}s)")
         return {
             "success": False,
             "model": model,
@@ -344,6 +355,7 @@ async def call_gemini(
 
     logger.debug(f"调用 Gemini API, model: {model}")
 
+    start_time = time.time()
     try:
         response = await client.post(
             url,
@@ -354,28 +366,38 @@ async def call_gemini(
         response.raise_for_status()
         result = response.json()
 
-        logger.info("Gemini API 调用成功")
+        elapsed = time.time() - start_time
+        logger.info(f"Gemini API call completed in {elapsed:.2f}s")
+
+        # DEBUG 级别记录响应
+        content = result["candidates"][0]["content"]["parts"][0]["text"]
+        logger.debug(f"Gemini response:\n{content[:500]}...")
+
         # 解析 decision
-        decision_data = parse_decision_from_content(result["candidates"][0]["content"]["parts"][0]["text"])
+        decision_data = parse_decision_from_content(content)
+
+        logger.info(f"Gemini decision: {decision_data['decision']}, reason: {decision_data['reason'][:50]}")
 
         return {
             "success": True,
             "model": model,
-            "content": result["candidates"][0]["content"]["parts"][0]["text"],
+            "content": content,
             "decision": decision_data["decision"],
             "reason": decision_data["reason"],
             "feedback": decision_data["feedback"],
             "usage": result.get("usageMetadata", {})
         }
     except httpx.HTTPStatusError as e:
-        logger.error(f"Gemini API HTTP 错误: {e.response.status_code}")
+        elapsed = time.time() - start_time
+        logger.error(f"Gemini API HTTP 错误: {e.response.status_code} (after {elapsed:.2f}s)")
         return {
             "success": False,
             "model": model,
             "error": f"HTTP {e.response.status_code}: {e.response.text[:200]}"
         }
     except Exception as e:
-        logger.error(f"Gemini API 调用失败: {str(e)}")
+        elapsed = time.time() - start_time
+        logger.error(f"Gemini API 调用失败: {str(e)} (after {elapsed:.2f}s)")
         return {
             "success": False,
             "model": model,
@@ -472,14 +494,19 @@ async def audit_plan(context: dict) -> dict:
     async with httpx.AsyncClient(proxy=proxy if proxy else None) as client:
         # 并行调用双模型
         tasks = []
+        call_count = 0
+
+        logger.info(f"Calling reviewers (timeout: 120s)...")
 
         if qwen_api_key:
             tasks.append(call_qwen(client, qwen_api_key, qwen_model, plan_content, proxy, context))
+            call_count += 1
         else:
             logger.warning("跳过 Qwen API 调用（未配置 API Key）")
 
         if gemini_api_key:
             tasks.append(call_gemini(client, gemini_api_key, gemini_model, plan_content, proxy, context))
+            call_count += 1
         else:
             logger.warning("跳过 Gemini API 调用（未配置 API Key）")
 
@@ -611,6 +638,8 @@ async def main():
     global _request_id
     _request_id = generate_request_id()
 
+    logger.info("Script started")
+
     # 默认 context
     context = {
         "plan": "",
@@ -629,6 +658,7 @@ async def main():
     # 如果有命令行参数，优先使用
     if args.plan:
         context["plan"] = " ".join(args.plan)
+        logger.debug("Using command line arguments")
     else:
         # 从 stdin 读取内容
         stdin_content = sys.stdin.read()
@@ -641,9 +671,13 @@ async def main():
                 context["session_id"] = input_data.get("session_id", "")
                 context["cwd"] = input_data.get("cwd", "")
                 context["transcript_path"] = input_data.get("transcript_path", "")
+                logger.debug(f"Input parsed, tool: {input_data.get('tool_name', 'N/A')}")
         except json.JSONDecodeError:
             # 不是 JSON，使用原始内容
             context["plan"] = stdin_content
+            logger.debug("Input parsed as raw text")
+
+    logger.debug(f"Plan length: {len(context['plan'])} chars")
 
     if not context["plan"]:
         logger.error("未提供计划内容")
