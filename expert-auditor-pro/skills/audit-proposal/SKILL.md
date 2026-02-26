@@ -16,32 +16,37 @@ description: This skill should be used when the user asks to "audit proposal", "
 
 ## 输入格式
 
-支持 3 种输入方式：
-1. **stdin JSON（推荐）**
-2. 命令行参数
-3. stdin 原始文本
+### 方式1：stdin JSON（Claude Code 调用时使用）
 
-### 推荐：stdin JSON 格式
+从 stdin 读取 JSON，字段说明：
 
-```json
-{
-  "plan": "计划内容...",
-  "session_id": "session-id",
-  "cwd": "/path/to/project",
-  "transcript_path": "/path/to/transcript.jsonl"
-}
-```
+| 字段 | 必填 | 说明 |
+|------|------|------|
+| `plan` | ✅ | 计划内容 |
+| `session_id` | - | 会话 ID（用于日志） |
+| `cwd` | - | 当前工作目录（用于加载项目 CLAUDE.md） |
+| `transcript_path` | - | transcript 文件路径（用于加载用户消息） |
 
-### 命令行参数方式
+**示例：**
 
 ```bash
-uv run ${CLAUDE_PLUGIN_ROOT}/expert-auditor-pro/scripts/main.py "计划内容"
+echo '{"plan": "创建用户认证功能", "session_id": "abc123", "cwd": "/project"}' | uv run ${CLAUDE_PLUGIN_ROOT}/expert-auditor-pro/scripts/main.py
 ```
 
-### stdin 原始文本方式
+### 方式2：命令行参数
+
+直接传入计划内容作为参数：
 
 ```bash
-echo "计划内容" | uv run ${CLAUDE_PLUGIN_ROOT}/expert-auditor-pro/scripts/main.py
+uv run ${CLAUDE_PLUGIN_ROOT}/expert-auditor-pro/scripts/main.py "创建用户认证功能"
+```
+
+### 方式3：stdin 原始文本
+
+管道传入纯文本计划：
+
+```bash
+echo "创建用户认证功能" | uv run ${CLAUDE_PLUGIN_ROOT}/expert-auditor-pro/scripts/main.py
 ```
 
 ## 输出格式
