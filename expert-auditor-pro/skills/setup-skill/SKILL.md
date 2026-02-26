@@ -1,10 +1,10 @@
 ---
-name: Setup Skill
-description: This skill should be used when the user asks to "setup", "configure API keys", "配置 API Keys", "设置密钥", or needs to configure Qwen/Gemini API keys for the plugin.
+name: setup-skill
+description: This skill should be used when the user asks to "configure API keys", "setup API keys", "configure Qwen", "configure Gemini", "设置 API Keys", or needs to set up Qwen/Gemini API keys for the expert-auditor-pro plugin.
 version: 1.0.0
 ---
 
-# Setup Skill
+# setup-skill
 
 交互式录入并保存 API Keys 到 config.json。
 

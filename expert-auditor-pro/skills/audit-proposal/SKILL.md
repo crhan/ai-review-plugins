@@ -1,10 +1,10 @@
 ---
-name: Audit Proposal
+name: audit-proposal
 description: This skill should be used when the user asks to "audit proposal", "review plan", "双模型审计", "审查计划", or wants to review a plan using dual AI models (Qwen + Gemini).
 version: 1.0.0
 ---
 
-# Audit Proposal Skill
+# audit-proposal
 
 使用双模型（Qwen + Gemini）并行审计计划，生成对比报告。
 
