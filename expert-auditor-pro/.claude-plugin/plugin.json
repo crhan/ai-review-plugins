@@ -3,16 +3,8 @@
   "version": "1.1.0",
   "description": "双模型审计插件",
   "author": { "name": "ruohanc" },
-  "commands": [
-    {
-      "name": "setup_skill",
-      "description": "配置 API Keys",
-      "file": "commands/setup_skill.md"
-    },
-    {
-      "name": "audit_proposal",
-      "description": "审计当前计划",
-      "file": "commands/audit_proposal.md"
-    }
+  "skills": [
+    "audit-proposal",
+    "setup-skill"
   ]
 }
