@@ -7,11 +7,27 @@ import asyncio
 import json
 import re
 import sys
+import uuid
 from pathlib import Path
 from typing import Any, Optional
 
 import httpx
 from loguru import logger
+
+
+def generate_request_id() -> str:
+    """生成请求 ID（8位十六进制）"""
+    return uuid.uuid4().hex[:8]
+
+
+# 全局 request_id
+_request_id = ""
+
+
+def _update_log_record(record):
+    """更新日志记录，添加 request_id"""
+    record["extra"].setdefault("request_id", _request_id)
+    record["message"] = sanitize_message(str(record["message"]))
 
 # 配置路径
 PLUGIN_DIR = Path(__file__).parent.parent
@@ -37,13 +53,13 @@ def sanitize_message(message: str) -> str:
 
 # 配置 Loguru
 logger.configure(
-    patcher=lambda record: record.update(message=sanitize_message(str(record["message"])))
+    patcher=_update_log_record
 )
 
 # stderr 彩色输出 (DEBUG 级别)
 logger.add(
     sys.stderr,
-    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{message}</cyan>",
+    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <cyan>{extra[request_id]: <8}</cyan> | <level>{level: <8}</level> | <cyan>{message}</cyan>",
     level="DEBUG",
     colorize=True
 )
@@ -75,6 +91,105 @@ def load_config() -> dict:
         logger.warning("Gemini API Key 未配置")
 
     return config
+
+
+def parse_decision_from_content(content: str) -> dict:
+    """从模型返回的文本中解析 decision/reason/feedback"""
+    import re
+
+    # 尝试 1: 直接解析整个 content 为 JSON
+    try:
+        data = json.loads(content.strip())
+        if isinstance(data, dict) and "decision" in data:
+            return {
+                "decision": data.get("decision", "CONCERNS"),
+                "reason": data.get("reason", ""),
+                "feedback": data.get("feedback", "")
+            }
+    except (json.JSONDecodeError, AttributeError):
+        pass
+
+    # 尝试 2: 从 JSON 块中提取
+    json_match = re.search(r'```json\s*(\{.*?\})\s*```', content, re.DOTALL)
+    if json_match:
+        try:
+            data = json.loads(json_match.group(1))
+            if "decision" in data:
+                return {
+                    "decision": data.get("decision", "CONCERNS"),
+                    "reason": data.get("reason", ""),
+                    "feedback": data.get("feedback", "")
+                }
+        except json.JSONDecodeError:
+            pass
+
+    # 尝试 3: 从文本开头提取关键词
+    content_upper = content.strip().upper()
+    if content_upper.startswith("APPROVE"):
+        return {"decision": "APPROVE", "reason": "Model approved", "feedback": ""}
+    elif content_upper.startswith("CONCERNS"):
+        return {"decision": "CONCERNS", "reason": "Model has concerns", "feedback": content}
+    elif content_upper.startswith("REJECT"):
+        return {"decision": "REJECT", "reason": "Model rejected", "feedback": content}
+
+    # 默认
+    return {"decision": "CONCERNS", "reason": "Unable to parse decision", "feedback": content}
+
+
+def merge_results(qwen_result: dict, gemini_result: dict) -> dict:
+    """
+    共识模式 B 决策：
+    - 任一 REJECT → REJECT
+    - 两个 APPROVE → APPROVE
+    - 一个 APPROVE + 一个 CONCERNS → 警告通过
+    - 两个 CONCERNS → REJECT
+    - 任一失败 → 视为 CONCERNS
+    """
+    # 处理 None 情况
+    qwen_result = qwen_result or {}
+    gemini_result = gemini_result or {}
+
+    # 提取决策
+    qwen_decision = qwen_result.get("decision", "CONCERNS") if qwen_result.get("success") else "CONCERNS"
+    gemini_decision = gemini_result.get("decision", "CONCERNS") if gemini_result.get("success") else "CONCERNS"
+
+    qwen_reason = qwen_result.get("reason", "")
+    gemini_reason = gemini_result.get("reason", "")
+
+    # 任一 REJECT
+    if qwen_decision == "REJECT" or gemini_decision == "REJECT":
+        return {
+            "decision": "REJECT",
+            "reason": qwen_reason or gemini_reason or "Model rejected",
+            "feedback": qwen_result.get("feedback", "") or gemini_result.get("feedback", ""),
+            "model": "qwen" if qwen_decision == "REJECT" else "gemini"
+        }
+
+    # 两个 CONCERNS
+    if qwen_decision == "CONCERNS" and gemini_decision == "CONCERNS":
+        return {
+            "decision": "REJECT",
+            "reason": "Both models have concerns",
+            "feedback": f"Qwen: {qwen_reason}\nGemini: {gemini_reason}",
+            "model": "both"
+        }
+
+    # 一个 APPROVE + 一个 CONCERNS
+    if (qwen_decision == "APPROVE" and gemini_decision == "CONCERNS") or \
+       (qwen_decision == "CONCERNS" and gemini_decision == "APPROVE"):
+        return {
+            "decision": "APPROVE",
+            "reason": "Approved with warnings",
+            "feedback": f"Warning: {qwen_reason or gemini_reason or 'One model has concerns'}",
+            "model": "qwen" if gemini_decision == "CONCERNS" else "gemini"
+        }
+
+    # 两个 APPROVE
+    return {
+        "decision": "APPROVE",
+        "reason": qwen_reason or "Both approved",
+        "model": "both"
+    }
 
 
 async def call_qwen(
@@ -124,10 +239,16 @@ async def call_qwen(
         result = response.json()
 
         logger.info("Qwen API 调用成功")
+        # 解析 decision
+        decision_data = parse_decision_from_content(result["choices"][0]["message"]["content"])
+
         return {
             "success": True,
             "model": model,
             "content": result["choices"][0]["message"]["content"],
+            "decision": decision_data["decision"],
+            "reason": decision_data["reason"],
+            "feedback": decision_data["feedback"],
             "usage": result.get("usage", {})
         }
     except httpx.HTTPStatusError as e:
@@ -199,10 +320,16 @@ async def call_gemini(
         result = response.json()
 
         logger.info("Gemini API 调用成功")
+        # 解析 decision
+        decision_data = parse_decision_from_content(result["candidates"][0]["content"]["parts"][0]["text"])
+
         return {
             "success": True,
             "model": model,
             "content": result["candidates"][0]["content"]["parts"][0]["text"],
+            "decision": decision_data["decision"],
+            "reason": decision_data["reason"],
+            "feedback": decision_data["feedback"],
             "usage": result.get("usageMetadata", {})
         }
     except httpx.HTTPStatusError as e:
@@ -221,10 +348,69 @@ async def call_gemini(
         }
 
 
-async def audit_plan(plan_content: str) -> dict:
+def load_global_claude() -> str:
+    """读取全局 CLAUDE.md"""
+    global_path = Path.home() / ".claude" / "CLAUDE.md"
+    if global_path.exists():
+        return global_path.read_text(encoding="utf-8")
+    return ""
+
+
+def load_project_claude(cwd: str) -> str:
+    """读取项目 CLAUDE.md"""
+    if not cwd:
+        return ""
+    project_path = Path(cwd) / "CLAUDE.md"
+    if project_path.exists():
+        return project_path.read_text(encoding="utf-8")
+    return ""
+
+
+def load_recent_messages(transcript_path: str, limit: int = 5) -> str:
+    """从 transcript JSONL 读取最近 N 条用户消息"""
+    if not transcript_path:
+        return ""
+    transcript = Path(transcript_path)
+    if not transcript.exists():
+        return ""
+
+    try:
+        lines = transcript.read_text().splitlines()
+        user_msgs = []
+        for line in lines[-50:]:  # 扫描最近50条
+            try:
+                msg = json.loads(line)
+                if msg.get("type") == "user":
+                    content = msg.get("message", {}).get("content", {})
+                    text = content.get("text", "")
+                    if text:
+                        user_msgs.append(text)
+            except json.JSONDecodeError:
+                continue
+        return "\n".join(user_msgs[-limit:])
+    except Exception:
+        return ""
+
+
+async def audit_plan(context: dict) -> dict:
     """
     并行调用双模型审计计划
+    context: 包含 plan, session_id, cwd, transcript_path 的字典
     """
+    plan_content = context.get("plan", "")
+    session_id = context.get("session_id", "")
+    cwd = context.get("cwd", "")
+    transcript_path = context.get("transcript_path", "")
+
+    logger.info(f"开始审计计划, session_id: {session_id}, cwd: {cwd}")
+
+    # 组装上下文
+    global_claude = load_global_claude()
+    project_claude = load_project_claude(cwd)
+    recent_messages = load_recent_messages(transcript_path)
+
+    logger.debug(f"Loaded context: global_claude={len(global_claude)} chars, project_claude={len(project_claude)} chars, recent_messages={len(recent_messages)} chars")
+
     config = load_config()
 
     proxy = config.get("proxy", "")
@@ -276,9 +462,16 @@ async def audit_plan(plan_content: str) -> dict:
             elif isinstance(result, Exception):
                 logger.error(f"并行调用异常: {result}")
 
+        # 合并结果
+        merged = merge_results(qwen_result or {}, gemini_result or {})
+        decision = merged.get("decision", "APPROVE")
+
+        logger.info(f"Merge decision: {decision}")
+
         return {
             "qwen": qwen_result,
-            "gemini": gemini_result
+            "gemini": gemini_result,
+            "merged": merged
         }
 
 
@@ -349,6 +542,22 @@ def generate_markdown_report(results: dict) -> str:
 
     if conclusions:
         report_lines.extend(conclusions)
+
+    # 添加最终决定（使用 merged 结果）
+    merged = results.get("merged", {})
+    if merged:
+        decision = merged.get("decision", "APPROVE")
+        reason = merged.get("reason", "")
+        feedback = merged.get("feedback", "")
+        if decision == "APPROVE":
+            report_lines.append(f"✅ 最终决定: APPROVE - {reason}")
+        elif decision == "CONCERNS":
+            report_lines.append(f"⚠️ 最终决定: CONCERNS - {reason}")
+        else:
+            report_lines.append(f"❌ 最终决定: REJECT - {reason}")
+
+        if feedback:
+            report_lines.extend(["", f"**反馈**: {feedback}"])
     else:
         report_lines.append("⚠️ 至少一个模型调用失败，请检查配置")
 
@@ -357,31 +566,49 @@ def generate_markdown_report(results: dict) -> str:
 
 async def main():
     """主入口"""
-    # 从 stdin 读取 JSON 输入
-    try:
-        input_data = json.load(sys.stdin)
-        plan_content = input_data.get("plan", "")
-    except json.JSONDecodeError:
-        # 尝试从参数读取
-        import argparse
-        parser = argparse.ArgumentParser()
-        parser.add_argument("--plan-file", action="store_true", help="从 stdin 读取计划")
-        parser.add_argument("plan", nargs="*", default="")
-        args = parser.parse_args()
+    global _request_id
+    _request_id = generate_request_id()
 
-        if args.plan:
-            plan_content = " ".join(args.plan)
-        else:
-            # 尝试从 stdin 读取原始内容
-            plan_content = sys.stdin.read()
+    # 默认 context
+    context = {
+        "plan": "",
+        "session_id": "",
+        "cwd": "",
+        "transcript_path": ""
+    }
 
-    if not plan_content:
+    # 先解析命令行参数（因为 stdin 只能读一次）
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--plan-file", action="store_true", help="从 stdin 读取计划")
+    parser.add_argument("plan", nargs="*", default="")
+    args = parser.parse_args()
+
+    # 如果有命令行参数，优先使用
+    if args.plan:
+        context["plan"] = " ".join(args.plan)
+    else:
+        # 从 stdin 读取内容
+        stdin_content = sys.stdin.read()
+
+        # 尝试解析 JSON
+        try:
+            if stdin_content.strip():
+                input_data = json.loads(stdin_content)
+                context["plan"] = input_data.get("plan", "")
+                context["session_id"] = input_data.get("session_id", "")
+                context["cwd"] = input_data.get("cwd", "")
+                context["transcript_path"] = input_data.get("transcript_path", "")
+        except json.JSONDecodeError:
+            # 不是 JSON，使用原始内容
+            context["plan"] = stdin_content
+
+    if not context["plan"]:
         logger.error("未提供计划内容")
         print("错误: 请提供计划内容", file=sys.stderr)
         sys.exit(1)
 
-    logger.info("开始审计计划")
-    results = await audit_plan(plan_content)
+    results = await audit_plan(context)
 
     # 生成报告
     report = generate_markdown_report(results)

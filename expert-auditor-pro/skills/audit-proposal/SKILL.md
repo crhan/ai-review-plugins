@@ -1,30 +1,28 @@
 ---
 name: audit-proposal
 description: This skill should be used when the user asks to "audit proposal", "review plan", "双模型审计", "审查计划", or wants to review a plan using dual AI models (Qwen + Gemini).
-version: 1.0.0
 ---
 
 # audit-proposal
 
 使用双模型（Qwen + Gemini）并行审计计划，生成对比报告。
 
-## 使用场景
+## 功能
 
-- 用户要求审查/审计计划
-- 需要双模型视角对比分析
-- 生成结构化审计报告
+- 上下文注入：全局 CLAUDE.md + 项目 CLAUDE.md + 用户消息
+- 双模型并行审计
+- 共识模式决策（任一 REJECT 拦截，两个 CONCERNS 拦截）
+- 脱敏日志记录
 
-## 执行流程
+## 输入格式
 
-1. 从 stdin 读取计划内容（JSON 格式）
-2. 调用 `scripts/main.py` 执行双模型审计
-3. 输出 Markdown 格式的对比报告
+支持 3 种输入方式：
+1. stdin JSON（推荐）
+2. 命令行参数
+3. stdin 原始文本
 
-## 调用方式
+### 推荐的 stdin JSON 格式
 
-### 读取计划内容
-
-计划内容通过 stdin 传入，格式为 JSON：
 ```json
 {
   "tool_name": "ExitPlanMode",
@@ -37,45 +35,63 @@ version: 1.0.0
 }
 ```
 
-### 执行审计
-
-使用以下命令调用审计脚本：
-
-```bash
-# 方式1: 从文件读取
-python3 scripts/main.py --plan-file /path/to/plan.json
-
-# 方式2: 从 stdin 读取
-python3 scripts/main.py --plan-file - <<< '{"plan": "YOUR_PLAN_CONTENT"}'
-```
-
 ## 输出格式
 
-审计完成后，输出 Markdown 格式报告：
+### stdout: Markdown 格式报告
 
 ```markdown
 # 双模型审计报告
 
 ## Qwen 审查结果
-[Qwen 的审查意见]
+
+[模型审查意见，包含 decision]
 
 ## Gemini 审查结果
-[Gemini 的审查意见]
+
+[模型审查意见]
 
 ## 综合结论
-[最终建议]
+
+✅ 最终决定: APPROVE - 原因
+或
+⚠️ 最终决定: CONCERNS - 原因
+或
+❌ 最终决定: REJECT - 原因
+
+**反馈**: [详细反馈内容]
 ```
+
+### stderr: JSON hook 格式（用于 skill 返回）
+
+```json
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "allow|deny",
+    "permissionDecisionReason": "原因"
+  }
+}
+```
+
+## 决策规则（共识模式 B）
+
+| 场景 | 结果 |
+|------|------|
+| 任一模型 REJECT | REJECT |
+| 两个模型都 APPROVE | APPROVE |
+| 一个 APPROVE + 一个 CONCERNS | 警告通过 |
+| 两个模型都 CONCERNS | REJECT |
+| 任一模型失败 | 视为 CONCERNS |
 
 ## 依赖脚本
 
-- **`scripts/main.py`** - 主审计脚本，负责并行调用双模型并汇总结果
-- **`scripts/config_manager.py`** - 配置管理，读取 API Keys
+- **`scripts/main.py`** - 主审计脚本
+- **`scripts/config_manager.py`** - 配置管理
 - **`config.json`** - 存储 API Keys 配置
 
 ## 配置要求
 
-首次使用前，确保已配置 API Keys：
+使用 `/setup_skill` 命令配置：
 - Qwen API Key
 - Gemini API Key
-
-使用 `/setup_skill` 命令或 `setup-skill` skill 配置。
+- 代理设置（可选）
