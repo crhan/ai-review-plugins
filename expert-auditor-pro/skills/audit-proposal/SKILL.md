@@ -17,27 +17,36 @@ description: This skill should be used when the user asks to "audit proposal", "
 ## 输入格式
 
 支持 3 种输入方式：
-1. stdin JSON（推荐）
+1. **stdin JSON（推荐）**
 2. 命令行参数
 3. stdin 原始文本
 
-### 推荐的 stdin JSON 格式
+### 推荐：stdin JSON 格式
 
 ```json
 {
-  "tool_name": "ExitPlanMode",
+  "plan": "计划内容...",
   "session_id": "session-id",
   "cwd": "/path/to/project",
-  "transcript_path": "/path/to/transcript.jsonl",
-  "tool_input": {
-    "plan": "计划内容..."
-  }
+  "transcript_path": "/path/to/transcript.jsonl"
 }
+```
+
+### 命令行参数方式
+
+```bash
+uv run ${CLAUDE_PLUGIN_ROOT}/expert-auditor-pro/scripts/main.py "计划内容"
+```
+
+### stdin 原始文本方式
+
+```bash
+echo "计划内容" | uv run ${CLAUDE_PLUGIN_ROOT}/expert-auditor-pro/scripts/main.py
 ```
 
 ## 输出格式
 
-### stdout: Markdown 格式报告
+直接输出 Markdown 格式报告：
 
 ```markdown
 # 双模型审计报告
@@ -61,18 +70,6 @@ description: This skill should be used when the user asks to "audit proposal", "
 **反馈**: [详细反馈内容]
 ```
 
-### stderr: JSON hook 格式（用于 skill 返回）
-
-```json
-{
-  "hookSpecificOutput": {
-    "hookEventName": "PreToolUse",
-    "permissionDecision": "allow|deny",
-    "permissionDecisionReason": "原因"
-  }
-}
-```
-
 ## 决策规则（共识模式 B）
 
 | 场景 | 结果 |
@@ -85,9 +82,18 @@ description: This skill should be used when the user asks to "audit proposal", "
 
 ## 依赖脚本
 
-- **`scripts/main.py`** - 主审计脚本
-- **`scripts/config_manager.py`** - 配置管理
-- **`config.json`** - 存储 API Keys 配置
+- **`${CLAUDE_PLUGIN_ROOT}/expert-auditor-pro/scripts/main.py`** - 主审计脚本
+- **`${CLAUDE_PLUGIN_ROOT}/expert-auditor-pro/scripts/config_manager.py`** - 配置管理
+- **`${CLAUDE_PLUGIN_ROOT}/expert-auditor-pro/config.json`** - 存储 API Keys 配置
+
+## 调用示例
+
+```bash
+# 使用 uv run 执行（推荐）
+uv run ${CLAUDE_PLUGIN_ROOT}/expert-auditor-pro/scripts/main.py
+```
+
+脚本会自动从 `${CLAUDE_PLUGIN_ROOT}/expert-auditor-pro/config.json` 读取配置。
 
 ## 配置要求
 
