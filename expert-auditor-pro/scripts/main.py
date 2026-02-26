@@ -52,9 +52,10 @@ def sanitize_message(message: str) -> str:
     return message
 
 
-# 配置 Loguru
+# 配置 Loguru - 移除默认 handler，使用自定义格式
 logger.configure(
-    patcher=_update_log_record
+    patcher=_update_log_record,
+    handlers=[]
 )
 
 # stderr 彩色输出 (DEBUG 级别)
