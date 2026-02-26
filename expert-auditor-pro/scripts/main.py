@@ -58,18 +58,40 @@ logger.configure(
     handlers=[]
 )
 
-# stderr 彩色输出 (DEBUG 级别)
+
+def info_filter(record):
+    """仅接受 INFO 级别"""
+    return record["level"].name == "INFO"
+
+
+def debug_filter(record):
+    """仅接受 DEBUG 级别"""
+    return record["level"].name == "DEBUG"
+
+
+# stderr 彩色输出 (INFO 级别，用户可见)
 logger.add(
     sys.stderr,
-    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <cyan>{extra[request_id]: <8}</cyan> | <level>{level: <8}</level> | <cyan>{message}</cyan>",
-    level="DEBUG",
+    format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{message}</cyan>",
+    level="INFO",
     colorize=True
 )
 
-# JSONL 文件日志
+# JSONL 日志文件 - 仅 INFO 级别
 logger.add(
-    str(LOG_DIR / "audit.jsonl"),
+    str(LOG_DIR / "info.jsonl"),
+    level="INFO",
+    filter=info_filter,
+    serialize=True,
+    rotation="50 MB",
+    retention="7 days"
+)
+
+# JSONL 日志文件 - 仅 DEBUG 级别（完整信息）
+logger.add(
+    str(LOG_DIR / "debug.jsonl"),
     level="DEBUG",
+    filter=debug_filter,
     serialize=True,
     rotation="100 MB",
     retention="7 days"
@@ -245,7 +267,7 @@ async def call_qwen(
         "max_tokens": 4096
     }
 
-    logger.debug(f"调用 Qwen API, model: {model}")
+    logger.debug(f"Calling Qwen, model: {model}, prompt length: {len(system_prompt) + len(plan_content)}")
 
     start_time = time.time()
     try:
@@ -259,16 +281,16 @@ async def call_qwen(
         result = response.json()
 
         elapsed = time.time() - start_time
-        logger.info(f"Qwen API call completed in {elapsed:.2f}s")
+        logger.info(f"Qwen done in {elapsed:.1f}s")
 
-        # DEBUG 级别记录响应
+        # DEBUG 级别记录完整响应
         content = result["choices"][0]["message"]["content"]
-        logger.debug(f"Qwen response:\n{content[:500]}...")
+        logger.debug(f"Qwen response ({len(content)} chars):\n{content[:800]}...")
 
         # 解析 decision
         decision_data = parse_decision_from_content(content)
 
-        logger.info(f"Qwen decision: {decision_data['decision']}, reason: {decision_data['reason'][:50]}")
+        logger.info(f"Qwen: {decision_data['decision']}")
 
         return {
             "success": True,
@@ -354,7 +376,7 @@ async def call_gemini(
         }
     }
 
-    logger.debug(f"调用 Gemini API, model: {model}")
+    logger.debug(f"Calling Gemini, model: {model}, prompt length: {len(system_prompt) + len(plan_content)}")
 
     start_time = time.time()
     try:
@@ -368,16 +390,16 @@ async def call_gemini(
         result = response.json()
 
         elapsed = time.time() - start_time
-        logger.info(f"Gemini API call completed in {elapsed:.2f}s")
+        logger.info(f"Gemini done in {elapsed:.1f}s")
 
-        # DEBUG 级别记录响应
+        # DEBUG 级别记录完整响应
         content = result["candidates"][0]["content"]["parts"][0]["text"]
-        logger.debug(f"Gemini response:\n{content[:500]}...")
+        logger.debug(f"Gemini response ({len(content)} chars):\n{content[:800]}...")
 
         # 解析 decision
         decision_data = parse_decision_from_content(content)
 
-        logger.info(f"Gemini decision: {decision_data['decision']}, reason: {decision_data['reason'][:50]}")
+        logger.info(f"Gemini: {decision_data['decision']}")
 
         return {
             "success": True,
@@ -460,14 +482,16 @@ async def audit_plan(context: dict) -> dict:
     cwd = context.get("cwd", "")
     transcript_path = context.get("transcript_path", "")
 
-    logger.info(f"开始审计计划, session_id: {session_id}, cwd: {cwd}")
+    # 会话信息放 INFO，细节放 DEBUG
+    logger.info(f"Audit session: {session_id[:8] if session_id else 'N/A'}, cwd: {cwd[:20] if cwd else 'N/A'}")
 
     # 组装上下文
     global_claude = load_global_claude()
     project_claude = load_project_claude(cwd)
     recent_messages = load_recent_messages(transcript_path)
 
-    logger.debug(f"Loaded context: global_claude={len(global_claude)} chars, project_claude={len(project_claude)} chars, recent_messages={len(recent_messages)} chars")
+    # DEBUG: 完整的上下文信息
+    logger.debug(f"Context loaded: global={len(global_claude)} chars, project={len(project_claude)} chars, messages={len(recent_messages)} chars")
 
     # 构建传递给 API 的 context
     context = {
@@ -535,8 +559,12 @@ async def audit_plan(context: dict) -> dict:
         # 合并结果
         merged = merge_results(qwen_result or {}, gemini_result or {})
         decision = merged.get("decision", "APPROVE")
+        reason = merged.get("reason", "")
 
-        logger.info(f"Merge decision: {decision}")
+        logger.info(f"Final: {decision} ({merged.get('model', 'N/A')})")
+
+        # DEBUG: 详细原因
+        logger.debug(f"Merge details: qwen={qwen_result.get('decision', 'N/A') if qwen_result else 'fail'}, gemini={gemini_result.get('decision', 'N/A') if gemini_result else 'fail'}, reason={reason[:100]}")
 
         return {
             "qwen": qwen_result,
@@ -672,13 +700,15 @@ async def main():
                 context["session_id"] = input_data.get("session_id", "")
                 context["cwd"] = input_data.get("cwd", "")
                 context["transcript_path"] = input_data.get("transcript_path", "")
-                logger.debug(f"Input parsed, tool: {input_data.get('tool_name', 'N/A')}")
+                # DEBUG: 完整输入信息
+                logger.debug(f"Input: tool={input_data.get('tool_name', 'N/A')}, session={context['session_id'][:8] if context['session_id'] else 'N/A'}, cwd={context['cwd'][:30] if context['cwd'] else 'N/A'}")
         except json.JSONDecodeError:
             # 不是 JSON，使用原始内容
             context["plan"] = stdin_content
-            logger.debug("Input parsed as raw text")
+            logger.debug("Input: raw text")
 
-    logger.debug(f"Plan length: {len(context['plan'])} chars")
+    # DEBUG: 计划长度
+    logger.debug(f"Plan: {len(context['plan'])} chars")
 
     if not context["plan"]:
         logger.error("未提供计划内容")
