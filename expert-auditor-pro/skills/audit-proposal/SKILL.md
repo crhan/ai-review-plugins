@@ -13,6 +13,10 @@ description: This skill should be used when the user asks to "audit proposal", "
 - 双模型并行审计
 - 共识模式决策（任一 REJECT 拦截，两个 CONCERNS 拦截）
 - 脱敏日志记录
+- **Peer Reviewer 角色**：你和外部模型（Qwen/Gemini）是对等的 peer reviewer
+  - 当外部模型 APPROVE 时 → 直接放行
+  - 当外部模型提出质疑时 → 你可以修正 plan 或在 plan 中辩护立场
+  - 多轮磋商无法达成一致时 → 短路放行，交由用户做最终裁决
 
 ## 输入格式
 
