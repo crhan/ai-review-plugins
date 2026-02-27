@@ -233,6 +233,7 @@ async def call_qwen(
 
     # 从 context 中提取上下文（限制长度以避免超时）
     global_claude = context.get("global_claude", "")[:3000] if context.get("global_claude") else ""
+    review_notes = context.get("review_notes", "")[:1500] if context.get("review_notes") else ""
     project_claude = context.get("project_claude", "")[:2000] if context.get("project_claude") else ""
     recent_messages = context.get("recent_messages", "")[:1500] if context.get("recent_messages") else ""
 
@@ -254,6 +255,9 @@ async def call_qwen(
 
 ### 近期用户消息
 {recent_messages if recent_messages else "(无)"}
+
+### 前期审查反馈
+{review_notes if review_notes else "(本轮为首轮审查，无历史反馈)"}
 
 请直接给出审查结论，使用 APPROVE / CONCERNS / REJECT 之一作为开头。"""
 
