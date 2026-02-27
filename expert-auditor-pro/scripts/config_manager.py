@@ -7,11 +7,12 @@ import json
 import argparse
 from pathlib import Path
 
-from paths import CONFIG_FILE, ensure_dirs, safe_write_config
+from paths import CONFIG_FILE, ensure_dirs, safe_write_config, get_config_path
 
 def load_config() -> dict:
     """加载配置文件"""
-    if not CONFIG_FILE.exists():
+    config_path = get_config_path()
+    if not config_path.exists():
         return {
             "qwen_api_key": "",
             "gemini_api_key": "",
@@ -19,7 +20,7 @@ def load_config() -> dict:
             "gemini_model": "gemini-3.1-pro-preview",
             "proxy": "http://127.0.0.1:7890"
         }
-    with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+    with open(config_path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 def save_config(config: dict) -> None:
