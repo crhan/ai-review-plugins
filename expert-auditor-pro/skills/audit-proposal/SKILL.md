@@ -15,6 +15,28 @@ description: This skill should be used when the user asks to "audit proposal", "
 
 ## 核心流程
 
+```mermaid
+flowchart TD
+    A[开始审计] --> B{调用外部模型}
+    B --> C[获取反馈: APPROVE/CONCERNS/REJECT]
+    C --> D{评估反馈类型}
+
+    D -->|安全漏洞| E[必须采纳 → 修改 plan]
+    D -->|性能/可用性| F[尽量采纳 → 修改 plan]
+    D -->|设计偏好| G[保留辩护 → 记录到 review-notes.md]
+
+    E --> H{迭代}
+    F --> H
+    G --> H
+
+    H -->|修正后| B
+    H -->|10轮内 APPROVE| I[结束]
+    H -->|10轮后仍有分歧| J[交由用户裁决]
+
+    style I fill:#90EE90
+    style J fill:#FFD700
+```
+
 1. **调用外部模型**：通过 main.py 脚本并行调用 Qwen 和 Gemini
 2. **获取反馈**：接收审查意见（APPROVE / CONCERNS / REJECT）
 3. **评估反馈**：
