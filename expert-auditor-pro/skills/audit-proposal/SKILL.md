@@ -25,26 +25,36 @@ description: This skill should be used when the user asks to "audit proposal", "
 
 ## 输入格式
 
-### 最高优先级：自动发现 plan 文件
+### 自动发现 plan 文件（推荐）
 
-调用时自动在以下位置查找最近修改的 plan 文件：
+skill 会自动在以下位置查找最近修改的 plan 文件：
 - `$CWD/docs/plans/`
 - `$HOME/.claude/plan/`
 
-找到后用 `--plan-file` 参数传入：
+你只需执行：
 
 ```bash
 PLAN_FILE=$(find "$PWD/docs/plans" "$HOME/.claude/plan" -name "*.md" -type f -exec ls -t {} + 2>/dev/null | head -1)
 uv run ${CLAUDE_PLUGIN_ROOT}/expert-auditor-pro/scripts/main.py --plan-file "$PLAN_FILE"
 ```
 
-### 方式2：stdin JSON
+如果找不到 plan 文件，会报错提醒你。
+
+### 手动指定 plan 文件
+
+如果你知道具体路径，可以直接指定：
+
+```bash
+uv run ${CLAUDE_PLUGIN_ROOT}/expert-auditor-pro/scripts/main.py --plan-file "/path/to/plan.md"
+```
+
+### stdin JSON（传入计划内容）
 
 ```bash
 echo '{"plan": "计划内容", "cwd": "/project"}' | uv run ${CLAUDE_PLUGIN_ROOT}/expert-auditor-pro/scripts/main.py
 ```
 
-### 方式3：命令行参数
+### 命令行参数
 
 ```bash
 uv run ${CLAUDE_PLUGIN_ROOT}/expert-auditor-pro/scripts/main.py "计划内容"
