@@ -712,7 +712,7 @@ async def audit_plan(context: dict) -> dict:
     # 组装上下文
     global_claude = load_global_claude()
     project_claude = load_project_claude(cwd)
-    recent_messages = load_recent_messages(transcript_path, cwd)
+    recent_messages = ""  # 已禁用：用户要求不加载 messages
 
     # 获取 plan_path 并加载 review_notes
     review_notes = load_review_notes(plan_path)
@@ -757,7 +757,7 @@ async def audit_plan(context: dict) -> dict:
 
         # 统一记录 prompt 统计
         ctx = context  # context 已在前面定义
-        logger.info(f"Prompt stats: plan={len(plan_content)} chars, global={len(ctx.get('global_claude', ''))} chars, project={len(ctx.get('project_claude', ''))} chars, messages={len(ctx.get('recent_messages', ''))} chars, review_notes={len(ctx.get('review_notes', ''))} chars")
+        logger.info(f"Prompt stats: plan={len(plan_content)} chars, global={len(ctx.get('global_claude', ''))} chars, project={len(ctx.get('project_claude', ''))} chars, review_notes={len(ctx.get('review_notes', ''))} chars")
 
         logger.info(f"Calling reviewers (timeout: 120s)...")
 

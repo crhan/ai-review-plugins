@@ -131,17 +131,17 @@ python3 /Users/ruohan.chen/Documents/GitHub/ai-review-plugins/gemini-plan-review
 
 ### 配置文件位置
 
-- API Keys: `expert-auditor-pro/config.json`
-- 日志: `~/.cache/expert-auditor-pro/logs/`
+- API Keys: `~/.claude/plugin/expert-auditor-pro/config.json`
+- 日志: `~/.claude/plugin/expert-auditor-pro/logs/`
 
 ### 日志查看
 
 ```bash
 # INFO 级别
-tail -f ~/.cache/expert-auditor-pro/logs/info.jsonl | jq -r '.text // .message'
+tail -f ~/.claude/plugin/expert-auditor-pro/logs/info.jsonl | jq -r '.text // .message'
 
 # DEBUG 级别
-tail -f ~/.cache/expert-auditor-pro/logs/debug.jsonl | jq -r '.text // .message'
+tail -f ~/.claude/plugin/expert-auditor-pro/logs/debug.jsonl | jq -r '.text // .message'
 ```
 
 ### 配置 API Keys

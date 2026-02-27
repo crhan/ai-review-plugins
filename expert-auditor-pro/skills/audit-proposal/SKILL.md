@@ -10,6 +10,7 @@ description: This skill should be used when the user asks to "audit proposal", "
 ## 触发时机
 
 在以下阶段调用：
+
 - **brainstorming 阶段**：有初步想法时，快速发现方向性问题
 - **writing-plans 阶段**：计划完成后，最后纠错
 
@@ -54,6 +55,7 @@ flowchart TD
 ## 你的角色
 
 你是**对等的 peer reviewer**。外部模型的意见是参考，不是圣旨。你需要：
+
 - 尊重模型的专业建议
 - 但也有权质疑模型的判断
 - 最终目标是产出更好的设计方案，而不是盲目服从模型
@@ -66,13 +68,17 @@ flowchart TD
 # 审查对话记录
 
 ## 第1轮
+
 ### 外部模型反馈
+
 [模型的意见]
 
 ### 我的回应
+
 [我的辩护/修改]
 
 ## 第2轮
+
 ...
 ```
 
@@ -83,6 +89,7 @@ flowchart TD
 ### 自动发现 plan 文件（推荐）
 
 skill 自动在以下位置查找最近修改的 plan：
+
 - `$CWD/docs/plans/`
 - `$HOME/.claude/plan/`
 
@@ -91,27 +98,28 @@ skill 自动在以下位置查找最近修改的 plan：
 ```bash
 PLAN_FILE=$(find "$PWD/docs/plans" "$HOME/.claude/plan" -name "*.md" -type f -exec ls -t {} + 2>/dev/null | head -1)
 echo "{\"plan\": \"\", \"cwd\": \"$PWD\", \"transcript_path\": \"$CLAUDE_TRANSCRIPT\"}" | jq --arg "$(cat "$PLAN_FILE")" '.plan = $arg' > /tmp/audit_input.json
-uv run ${CLAUDE_PLUGIN_ROOT}/expert-auditor-pro/scripts/main.py --plan-file "$PLAN_FILE"
+uv run ${CLAUDE_PLUGIN_ROOT}/scripts/main.py --plan-file "$PLAN_FILE"
 ```
 
 > 注意：`$CLAUDE_TRANSCRIPT` 是 Claude Code 提供的环境变量，包含当前会话的 transcript 路径。
+> 注意：自动发现 review-notes.md，与 plan 文件同目录，命名为 `{plan-name}-review-notes.md`
 
 ### 手动指定 plan 文件
 
 ```bash
-uv run ${CLAUDE_PLUGIN_ROOT}/expert-auditor-pro/scripts/main.py --plan-file "/path/to/plan.md"
+uv run ${CLAUDE_PLUGIN_ROOT}/scripts/main.py --plan-file "/path/to/plan.md"
 ```
 
 ### stdin JSON
 
 ```bash
-echo '{"plan": "计划内容", "cwd": "/project", "transcript_path": "/path/to/transcript.jsonl"}' | uv run ${CLAUDE_PLUGIN_ROOT}/expert-auditor-pro/scripts/main.py
+echo '{"plan": "计划内容", "cwd": "/project", "transcript_path": "/path/to/transcript.jsonl"}' | uv run ${CLAUDE_PLUGIN_ROOT}/scripts/main.py
 ```
 
 ### 命令行参数
 
 ```bash
-uv run ${CLAUDE_PLUGIN_ROOT}/expert-auditor-pro/scripts/main.py "计划内容"
+uv run ${CLAUDE_PLUGIN_ROOT}/scripts/main.py "计划内容"
 ```
 
 ## 输出格式
@@ -122,23 +130,26 @@ uv run ${CLAUDE_PLUGIN_ROOT}/expert-auditor-pro/scripts/main.py "计划内容"
 # 双模型审计报告
 
 ## Qwen 审查结果
+
 [审查意见，包含 decision: APPROVE/CONCERNS/REJECT]
 
 ## Gemini 审查结果
+
 [审查意见]
 
 ## 综合结论
+
 ✅/⚠️/❌ 最终决定 + 原因 + 反馈
 ```
 
 ## 决策规则
 
-| 场景 | 结果 |
-|------|------|
-| 任一模型 REJECT | 需处理反馈后才能继续 |
-| 两个模型都 APPROVE | 结束，plan 可以执行 |
-| 一个 APPROVE + 一个 CONCERNS | 警告通过 |
-| 两个模型都 CONCERNS | 需处理反馈后才能继续 |
+| 场景                         | 结果                 |
+| ---------------------------- | -------------------- |
+| 任一模型 REJECT              | 需处理反馈后才能继续 |
+| 两个模型都 APPROVE           | 结束，plan 可以执行  |
+| 一个 APPROVE + 一个 CONCERNS | 警告通过             |
+| 两个模型都 CONCERNS          | 需处理反馈后才能继续 |
 
 ## 错误处理
 
@@ -151,7 +162,7 @@ uv run ${CLAUDE_PLUGIN_ROOT}/expert-auditor-pro/scripts/main.py "计划内容"
 
 ```bash
 # 配置 API Keys
-cd ${CLAUDE_PLUGIN_ROOT}/expert-auditor-pro
+cd ${CLAUDE_PLUGIN_ROOT}
 uv run python scripts/config_manager.py --set-qwen-key "YOUR_KEY"
 uv run python scripts/config_manager.py --set-gemini-key "YOUR_KEY"
 ```
