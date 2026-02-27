@@ -5,6 +5,7 @@ Expert Auditor Pro - 双模型审计主程序
 """
 import asyncio
 import json
+import os
 import re
 import sys
 import time
@@ -14,6 +15,11 @@ from typing import Any, Optional
 
 import httpx
 from loguru import logger
+
+from paths import get_config_path, LOG_DIR, ensure_dirs, CONFIG_FILE
+
+# 启动时确保目录存在
+ensure_dirs()
 
 
 def generate_request_id() -> str:
@@ -29,14 +35,6 @@ def _update_log_record(record):
     """更新日志记录，添加 request_id"""
     record["extra"].setdefault("request_id", _request_id)
     record["message"] = sanitize_message(str(record["message"]))
-
-# 配置路径
-PLUGIN_DIR = Path(__file__).parent.parent
-CONFIG_FILE = PLUGIN_DIR / "config.json"
-LOG_DIR = Path.home() / ".cache" / "expert-auditor-pro" / "logs"
-
-# 确保日志目录存在
-LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def sanitize_message(message: str) -> str:
@@ -102,11 +100,12 @@ logger.info("Expert Auditor Pro 启动")
 
 def load_config() -> dict:
     """加载配置文件"""
-    if not CONFIG_FILE.exists():
+    config_path = get_config_path()
+    if not config_path.exists():
         logger.error("配置文件不存在")
-        raise FileNotFoundError(f"配置文件不存在: {CONFIG_FILE}")
+        raise FileNotFoundError(f"配置文件不存在: {config_path}")
 
-    with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+    with open(config_path, "r", encoding="utf-8") as f:
         config = json.load(f)
 
     if not config.get("qwen_api_key"):
@@ -231,11 +230,11 @@ async def call_qwen(
         "Content-Type": "application/json"
     }
 
-    # 从 context 中提取上下文（限制长度以避免超时）
-    global_claude = context.get("global_claude", "")[:3000] if context.get("global_claude") else ""
-    review_notes = context.get("review_notes", "")[:1500] if context.get("review_notes") else ""
-    project_claude = context.get("project_claude", "")[:2000] if context.get("project_claude") else ""
-    recent_messages = context.get("recent_messages", "")[:1500] if context.get("recent_messages") else ""
+    # 从 context 中提取上下文（不限制长度）
+    global_claude = context.get("global_claude", "") if context.get("global_claude") else ""
+    review_notes = context.get("review_notes", "") if context.get("review_notes") else ""
+    project_claude = context.get("project_claude", "") if context.get("project_claude") else ""
+    recent_messages = context.get("recent_messages", "") if context.get("recent_messages") else ""
 
     system_prompt = f"""你是一位资深的代码审查专家和架构师。审查计划时，请从以下6个维度评估：
 1. 完整性 - 是否包含所有必要步骤？
@@ -337,11 +336,11 @@ async def call_gemini(
         "Content-Type": "application/json"
     }
 
-    # 从 context 中提取上下文（限制长度以避免超时）
-    global_claude = context.get("global_claude", "")[:3000] if context.get("global_claude") else ""
-    review_notes = context.get("review_notes", "")[:1500] if context.get("review_notes") else ""
-    project_claude = context.get("project_claude", "")[:2000] if context.get("project_claude") else ""
-    recent_messages = context.get("recent_messages", "")[:1500] if context.get("recent_messages") else ""
+    # 从 context 中提取上下文（不限制长度）
+    global_claude = context.get("global_claude", "") if context.get("global_claude") else ""
+    review_notes = context.get("review_notes", "") if context.get("review_notes") else ""
+    project_claude = context.get("project_claude", "") if context.get("project_claude") else ""
+    recent_messages = context.get("recent_messages", "") if context.get("recent_messages") else ""
 
     system_prompt = f"""你是一位资深的代码审查专家和架构师。审查计划时，请从以下6个维度评估：
 1. 完整性 - 是否包含所有必要步骤？
@@ -448,35 +447,212 @@ def load_project_claude(cwd: str) -> str:
     """读取项目 CLAUDE.md"""
     if not cwd:
         return ""
-    project_path = Path(cwd) / "CLAUDE.md"
-    if project_path.exists():
-        return project_path.read_text(encoding="utf-8")
+    project_path = Path(cwd)
+    # 向上查找 CLAUDE.md，直到根目录
+    while project_path != project_path.parent:
+        claude_path = project_path / "CLAUDE.md"
+        if claude_path.exists():
+            return claude_path.read_text(encoding="utf-8")
+        project_path = project_path.parent
     return ""
 
 
-def load_recent_messages(transcript_path: str, limit: int = 5) -> str:
-    """从 transcript JSONL 读取最近 N 条用户消息"""
-    if not transcript_path:
+def find_transcript_by_cwd(cwd: str) -> str:
+    """根据 cwd 自动查找对应的 transcript 文件
+
+    查找规则：
+    1. 从 cwd 向上遍历，尝试匹配项目目录名
+    2. 返回最近修改的 .jsonl 文件
+    """
+    logger.debug(f"find_transcript_by_cwd called: {cwd}")
+    if not cwd:
         return ""
+
+    try:
+        cwd_path = Path(cwd).resolve()
+        logger.debug(f"cwd_path={cwd_path}")
+
+        # 查找项目目录
+        claude_projects = Path.home() / ".claude" / "projects"
+        logger.debug(f"claude_projects={claude_projects}, exists={claude_projects.exists()}")
+
+        if not claude_projects.exists():
+            return ""
+
+        # 从 cwd 向上遍历，尝试匹配目录名
+        current = cwd_path
+        while True:
+            # 尝试匹配项目目录
+            parts = current.parts
+            logger.debug(f"checking {current}")
+
+            if len(parts) >= 3 and parts[1] == "Users":
+                username = parts[2]
+                # 构建目录名格式
+                path_parts = parts[3:]
+                if path_parts:
+                    dir_name = "-".join(["Users"] + [username.replace(".", "-")] + list(path_parts))
+                else:
+                    dir_name = f"Users-{username.replace('.', '-')}"
+
+                proj_dir = claude_projects / f"-{dir_name}"
+                logger.debug(f"Checking proj_dir={proj_dir}, exists={proj_dir.exists()}")
+                if proj_dir.exists():
+                    jsonl_files = list(proj_dir.glob("*.jsonl"))
+                    logger.debug(f"Found {len(jsonl_files)} jsonl files")
+                    if jsonl_files:
+                        latest = max(jsonl_files, key=lambda p: p.stat().st_mtime)
+                        logger.debug(f"Auto-found transcript: {latest.name}")
+                        return str(latest)
+
+            # 向上遍历一层
+            if current.parent == current:
+                break  # 已经到根目录
+            current = current.parent
+
+        return ""
+
+    except Exception as e:
+        logger.debug(f"Failed to find transcript by cwd: {e}")
+        return ""
+
+
+def extract_message_content(msg: dict) -> str:
+    """从消息中提取文本内容"""
+    message = msg.get("message", {})
+    if not isinstance(message, dict):
+        return ""
+
+    content = message.get("content", "")
+    if isinstance(content, str) and content:
+        # 过滤 IDE 元信息
+        content = filter_ide_metadata(content)
+        return content
+    elif isinstance(content, list):
+        text_parts = []
+        for item in content:
+            if isinstance(item, dict):
+                item_type = item.get("type", "")
+                # text 类型：直接提取
+                if item_type == "text":
+                    text = item.get("text", "")
+                    if text:
+                        # 过滤 IDE 元信息
+                        text_parts.append(filter_ide_metadata(text))
+                # thinking 类型：提取思考内容（用于 assistant）
+                elif item_type == "thinking":
+                    thinking = item.get("thinking", "")
+                    if thinking:
+                        text_parts.append(thinking)
+                # tool_result 类型：提取工具输出（用于 user）
+                elif item_type == "tool_result":
+                    tool_content = item.get("content", "")
+                    if tool_content:
+                        text_parts.append(str(tool_content))
+        return "\n".join(text_parts)
+    return ""
+
+
+def filter_ide_metadata(text: str) -> str:
+    """过滤 IDE 元信息，如 <ide_opened_file>..."""
+    import re
+    if not text:
+        return ""
+    # 移除 <ide_opened_file>...</ide_opened_file> 标签
+    text = re.sub(r"<ide_opened_file>[^<]*</ide_opened_file>\n?", "", text)
+    # 移除 <command-message>...</command-message> 标签
+    text = re.sub(r"<command-message>[^<]*</command-message>\n?", "", text)
+    # 移除 <command-name>...</command-name> 标签
+    text = re.sub(r"<command-name>[^<]*</command-name>\n?", "", text)
+    # 移除 <command-args>...</command-args> 标签
+    text = re.sub(r"<command-args>[^<]*</command-args>\n?", "", text)
+    return text.strip()
+
+
+def load_recent_messages(transcript_path: str, cwd: str = "", limit: int = 5) -> str:
+    """从 transcript JSONL 读取最近 N 轮对话
+
+    每轮包含：用户消息 + AI 回应
+    如果未提供 transcript_path，会尝试根据 cwd 自动查找
+    """
+    logger.debug(f"load_recent_messages called: transcript_path={transcript_path[:50] if transcript_path else 'None'}..., cwd={cwd[:30] if cwd else 'None'}...")
+
+    # 如果没有提供 path，尝试自动查找
+    logger.debug(f"Looking for transcript, initial transcript_path={transcript_path[:30] if transcript_path else 'None'}")
+    if not transcript_path and cwd:
+        transcript_path = find_transcript_by_cwd(cwd)
+        logger.debug(f"After find_transcript_by_cwd: transcript_path={transcript_path[:30] if transcript_path else 'None'}")
+        if transcript_path:
+            logger.debug(f"Auto-found transcript: {transcript_path}")
+
+    if not transcript_path:
+        logger.debug("No transcript_path found, returning empty")
+        return ""
+
     transcript = Path(transcript_path)
+    logger.debug(f"Transcript path: {transcript}, exists={transcript.exists()}")
     if not transcript.exists():
         return ""
 
     try:
         lines = transcript.read_text().splitlines()
-        user_msgs = []
-        for line in lines[-50:]:  # 扫描最近50条
+        logger.debug(f"Transcript has {len(lines)} lines, starting to parse...")
+
+        # 按轮次组织对话
+        rounds = []
+        current_user_msg = None
+        current_assistant_msg = None
+        processed = 0
+
+        for line in lines:
+            processed += 1
+            if processed % 500 == 0:
+                logger.debug(f"Processed {processed} lines...")
+
             try:
                 msg = json.loads(line)
-                if msg.get("type") == "user":
-                    content = msg.get("message", {}).get("content", {})
-                    text = content.get("text", "")
-                    if text:
-                        user_msgs.append(text)
+                msg_type = msg.get("type")
+
+                if msg_type == "user":
+                    # 如果已有 user 消息，说明遇到了新的轮次，保存上一轮
+                    if current_user_msg is not None:
+                        rounds.append((current_user_msg, current_assistant_msg))
+                    # 开始新轮
+                    current_user_msg = extract_message_content(msg)
+                    current_assistant_msg = None
+
+                elif msg_type == "assistant":
+                    # 记录 AI 回应
+                    content = extract_message_content(msg)
+                    if content:  # 只有当有实际内容时才更新
+                        current_assistant_msg = content
+
             except json.JSONDecodeError:
                 continue
-        return "\n".join(user_msgs[-limit:])
-    except Exception:
+
+        # 保存最后一轮
+        logger.debug(f"Saving last round: current_user_msg={current_user_msg is not None}, current_assistant_msg={current_assistant_msg is not None}")
+        if current_user_msg is not None:
+            rounds.append((current_user_msg, current_assistant_msg))
+
+        logger.info(f"Found {len(rounds)} rounds")
+
+        # 取最近 N 轮
+        recent_rounds = rounds[-limit:] if rounds else []
+        logger.debug(f"Taking last {limit} rounds, got {len(recent_rounds)}")
+
+        # 组装结果
+        result_parts = []
+        for i, (user_msg, assistant_msg) in enumerate(recent_rounds):
+            if user_msg:
+                result_parts.append(f"## 轮次 {i + 1}\n\n### 用户\n{user_msg}\n\n### AI\n{assistant_msg or '(无回应)'}")
+
+        result = "\n\n".join(result_parts)
+        logger.debug(f"Assembled result: {len(result)} chars, {len(result_parts)} rounds")
+        return result
+
+    except Exception as e:
+        logger.info(f"Failed to load messages: {e}")
         return ""
 
 
@@ -529,20 +705,26 @@ async def audit_plan(context: dict) -> dict:
     # 会话信息放 INFO，细节放 DEBUG
     logger.info(f"Audit session: {session_id[:8] if session_id else 'N/A'}, cwd: {cwd[:20] if cwd else 'N/A'}")
 
+    # 记录 plan_path
+    plan_path = context.get("plan_path", "")
+    logger.info(f"Plan path: {plan_path if plan_path else '(none)'}")
+
     # 组装上下文
     global_claude = load_global_claude()
     project_claude = load_project_claude(cwd)
-    recent_messages = load_recent_messages(transcript_path)
+    recent_messages = load_recent_messages(transcript_path, cwd)
 
     # 获取 plan_path 并加载 review_notes
-    plan_path = context.get("plan_path", "")
     review_notes = load_review_notes(plan_path)
 
-    # DEBUG
-    logger.debug(f"Review notes loaded: {len(review_notes)} chars")
+    # INFO 级别记录 review_notes 状态
+    if review_notes:
+        logger.info(f"Review notes loaded: {len(review_notes)} chars")
+    else:
+        logger.info("No review notes found (first round or file not exists)")
 
     # DEBUG: 完整的上下文信息
-    logger.debug(f"Context loaded: global={len(global_claude)} chars, project={len(project_claude)} chars, messages={len(recent_messages)} chars")
+    logger.debug(f"Context loaded: global={len(global_claude)} chars, project={len(project_claude)} chars, messages={len(recent_messages)} chars, review_notes={len(review_notes)} chars")
 
     # 构建传递给 API 的 context
     context = {
@@ -572,6 +754,10 @@ async def audit_plan(context: dict) -> dict:
         # 并行调用双模型
         tasks = []
         call_count = 0
+
+        # 统一记录 prompt 统计
+        ctx = context  # context 已在前面定义
+        logger.info(f"Prompt stats: plan={len(plan_content)} chars, global={len(ctx.get('global_claude', ''))} chars, project={len(ctx.get('project_claude', ''))} chars, messages={len(ctx.get('recent_messages', ''))} chars, review_notes={len(ctx.get('review_notes', ''))} chars")
 
         logger.info(f"Calling reviewers (timeout: 120s)...")
 
@@ -741,6 +927,11 @@ async def main():
         plan_path = Path(args.plan_file)
         if plan_path.exists():
             context["plan"] = plan_path.read_text(encoding="utf-8")
+            context["plan_path"] = str(plan_path)
+            # 自动设置 cwd 为 plan 文件所在目录
+            context["cwd"] = str(plan_path.resolve().parent)
+            # 自动设置 transcript_path 从环境变量
+            context["transcript_path"] = os.environ.get("CLAUDE_TRANSCRIPT", "")
             logger.info(f"Using plan file: {plan_path}")
         else:
             logger.error(f"Plan file not found: {plan_path}")
