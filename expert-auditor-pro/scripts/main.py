@@ -526,6 +526,13 @@ async def audit_plan(context: dict) -> dict:
     project_claude = load_project_claude(cwd)
     recent_messages = load_recent_messages(transcript_path)
 
+    # 获取 plan_path 并加载 review_notes
+    plan_path = context.get("plan_path", "")
+    review_notes = load_review_notes(plan_path)
+
+    # DEBUG
+    logger.debug(f"Review notes loaded: {len(review_notes)} chars")
+
     # DEBUG: 完整的上下文信息
     logger.debug(f"Context loaded: global={len(global_claude)} chars, project={len(project_claude)} chars, messages={len(recent_messages)} chars")
 
@@ -533,7 +540,8 @@ async def audit_plan(context: dict) -> dict:
     context = {
         "global_claude": global_claude,
         "project_claude": project_claude,
-        "recent_messages": recent_messages
+        "recent_messages": recent_messages,
+        "review_notes": review_notes
     }
 
     config = load_config()
