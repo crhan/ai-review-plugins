@@ -23,14 +23,20 @@ def ensure_dirs():
 
 
 def get_config_path():
-    """获取配置路径"""
-    # 检查是否已迁移
+    """获取配置路径，优先新路径"""
+    # 已迁移：直接返回新路径
     if (BASE_DIR / ".migrated").exists():
         return CONFIG_FILE
 
-    # 首次运行：检查旧路径
+    # 新路径已存在：使用新路径
+    if CONFIG_FILE.exists():
+        return CONFIG_FILE
+
+    # 旧路径存在：回退到旧路径
     if OLD_CONFIG_FILE.exists():
         return OLD_CONFIG_FILE
+
+    # 默认返回新路径
     return CONFIG_FILE
 
 
