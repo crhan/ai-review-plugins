@@ -472,6 +472,42 @@ def load_recent_messages(transcript_path: str, limit: int = 5) -> str:
         return ""
 
 
+def load_review_notes(plan_path: str) -> str:
+    """根据 plan 文件路径加载对应的 review-notes
+
+    查找规则：plan.md -> plan-review-notes.md
+    """
+    if not plan_path:
+        logger.debug("No plan_path provided, skipping review_notes")
+        return ""
+
+    plan_file = Path(plan_path).resolve()  # 解析绝对路径防止路径遍历
+
+    # 锁定在项目 docs/plans 目录内
+    if not str(plan_file).startswith(str(Path.cwd() / "docs" / "plans")):
+        logger.debug(f"plan_path outside allowed directory: {plan_path}")
+        return ""
+
+    if not plan_file.exists():
+        logger.debug(f"Plan file not found: {plan_path}")
+        return ""
+
+    # 构建 review-notes 路径
+    review_notes_path = plan_file.with_name(plan_file.stem + "-review-notes.md")
+
+    if review_notes_path.exists():
+        try:
+            content = review_notes_path.read_text(encoding="utf-8", errors="replace")
+            logger.debug(f"Loaded review notes: {len(content)} chars from {review_notes_path.name}")
+            return content
+        except Exception as e:
+            logger.debug(f"Failed to read review notes: {e}")
+            return ""
+
+    logger.debug("No review-notes file found")
+    return ""
+
+
 async def audit_plan(context: dict) -> dict:
     """
     并行调用双模型审计计划
