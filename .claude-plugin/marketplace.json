@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "expert-auditor-pro",
-      "version": "1.2.2",
+      "version": "1.2.3",
       "description": "双模型审计插件 - 使用 Qwen + Gemini 并行审计计划",
       "source": "./expert-auditor-pro",
       "category": "security"
