@@ -7,7 +7,7 @@ import json
 import argparse
 from pathlib import Path
 
-CONFIG_FILE = Path(__file__).parent.parent / "config.json"
+from paths import CONFIG_FILE, ensure_dirs, safe_write_config
 
 def load_config() -> dict:
     """加载配置文件"""
@@ -24,8 +24,8 @@ def load_config() -> dict:
 
 def save_config(config: dict) -> None:
     """保存配置文件"""
-    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump(config, f, indent=4, ensure_ascii=False)
+    content = json.dumps(config, indent=4, ensure_ascii=False)
+    safe_write_config(content)
 
 def set_qwen_key(key: str) -> None:
     """设置 Qwen API Key"""
