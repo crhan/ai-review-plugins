@@ -33,44 +33,16 @@ Expert Auditor Pro 是一个 Claude Code 插件，在计划模式（Plan Mode）
 
 ## 初始化配置
 
-### 1. 安装 uv（如未安装）
+安装插件后，运行以下命令初始化环境并配置 API Keys：
 
-```bash
-# macOS
-brew install uv
-
-# 或使用 pip
-pip install uv
+```
+/setup-skill
 ```
 
-### 2. 同步依赖
-
-```bash
-cd expert-auditor-pro
-uv sync
-```
-
-### 3. 配置 API Keys
-
-```bash
-# 设置 Qwen API Key
-uv run python scripts/config_manager.py --set-qwen-key "YOUR_QWEN_KEY"
-
-# 设置 Gemini API Key
-uv run python scripts/config_manager.py --set-gemini-key "YOUR_GEMINI_KEY"
-```
-
-或使用交互式配置：
-
-```bash
-uv run python scripts/config_manager.py
-```
-
-### 4. 验证配置
-
-```bash
-uv run python scripts/main.py --help
-```
+这将自动：
+1. 检查并安装依赖（使用 uv）
+2. 验证环境配置
+3. 提示输入 Qwen 和 Gemini API Keys
 
 ## 配置说明
 
