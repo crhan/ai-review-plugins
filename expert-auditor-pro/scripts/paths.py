@@ -1,5 +1,6 @@
 """路径常量集中管理"""
 import os
+import shutil
 from pathlib import Path
 
 PLUGIN_NAME = "expert-auditor-pro"
@@ -43,10 +44,15 @@ def get_config_path():
 def safe_write_config(content: str):
     """原子写配置文件，防止竞态条件"""
     ensure_dirs()
-    # 原子操作：创建文件时直接指定权限
-    fd = os.open(str(CONFIG_FILE), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, 'w', encoding='utf-8') as f:
-        f.write(content)
+    config_path = get_config_path()  # 使用动态路径，支持迁移检测
+    try:
+        fd = os.open(str(config_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            f.write(content)
+    except OSError as e:
+        import logging
+        logging.error(f"Failed to write config to {config_path}: {e}")
+        raise
 
 
 def cleanup_old_files():
@@ -54,7 +60,7 @@ def cleanup_old_files():
     if OLD_CONFIG_FILE.exists():
         backup_path = OLD_CONFIG_FILE.with_suffix('.json.bak')
         OLD_CONFIG_FILE.rename(backup_path)
+        os.chmod(backup_path, 0o600)
     if OLD_LOG_DIR.exists():
-        import shutil
         backup_log = OLD_LOG_DIR.parent / f"{OLD_LOG_DIR.name}.bak"
         shutil.move(str(OLD_LOG_DIR), str(backup_log))
